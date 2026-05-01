@@ -127,13 +127,6 @@ export class OrdersService {
       totalWeight: cart.totalWeight,
     });
 
-
-    await this.cartService.mergeGuestIntoUser('', userId);
-    await this.cartService.getOrCreateForUser(userId).then(c => {
-      c.items = [];
-      return c.save();
-    });
-
     return order;
   }
 
@@ -211,13 +204,16 @@ export class OrdersService {
       throw new Error('Amount mismatch');
     }
 
-
     order.paymentStatus = 'paid';
     order.orderStatus = 'confirmed';
     order.paymentId = paymentId;
 
     await order.save();
 
+    await this.cartService.getOrCreateForUser(order.userId).then(c => {
+      c.items = [];
+      return c.save();
+    });
 
     const user = await this.userModel.findById(order.userId);
 
@@ -226,7 +222,6 @@ export class OrdersService {
       await order.save();
       return;
     }
-
 
     try {
       const zohoOrderId = await this.zohoInventoryService.createSalesOrder(
@@ -285,12 +280,8 @@ export class OrdersService {
       return { status: 'paid', orderId: order.orderId };
     }
 
-    if (status === 'failed') {
-      await this.handlePaymentFailure(orderId);
-      return { status: 'failed', orderId: order.orderId };
-    }
-
-    return { status: 'pending', orderId: order.orderId };
+    await this.handlePaymentFailure(orderId);
+    return { status: 'failed', orderId: order.orderId };
   }
 
   async handlePaymentFailure(orderId: string) {

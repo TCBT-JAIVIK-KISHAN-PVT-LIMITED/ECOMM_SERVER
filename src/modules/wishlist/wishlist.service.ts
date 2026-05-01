@@ -31,7 +31,6 @@ export class WishlistService {
     const products = await this.productModel.find({
       zoho_item_id: { $in: ids },
       is_active: true,
-      show_in_storefront: true,
     });
 
     // 🔥 Map products
