@@ -11,6 +11,7 @@ import { Product } from '../products/schemas/product.schema';
 import { ShippingService } from '../../integrations/shipping/shipping.service';
 import { UsersService } from '../users/users.service';
 import { SmsService } from './sms.service';
+import { Coupon } from '../coupon/schema/coupon.schema';
 
 @Injectable()
 export class OrdersService {
@@ -24,10 +25,12 @@ export class OrdersService {
     private paymentService: ZohoPaymentGatewayService,
     private shippingService: ShippingService,
     private readonly smsService: SmsService,
+    @InjectModel(Coupon.name)
+    private couponModel: Model<Coupon>,
   ) { }
 
   async createOrder(userId: string, dto: any) {
-    const { items, address, totalWeight } = dto;
+    const { items, address, totalWeight, discount = 0, couponName = null } = dto;
 
     if (!totalWeight || totalWeight <= 0) {
       throw new BadRequestException('Invalid total weight from cart');
@@ -48,6 +51,8 @@ export class OrdersService {
       };
     });
 
+    const discountedAmount = Math.max(totalAmount - discount, 0);
+
     const type_of_package = totalWeight < 20000 ? 'SPS' : 'B2B';
 
     console.log('Total Weight:', totalWeight);
@@ -61,7 +66,7 @@ export class OrdersService {
 
     const shippingCharge = shipping.shippingCharge;
     console.log('Calculated Shipping Charge:', shippingCharge);
-    const finalAmount = totalAmount + shippingCharge;
+    const finalAmount = discountedAmount + shippingCharge;
 
     const order = await this.orderModel.create({
       userId,
@@ -89,7 +94,7 @@ export class OrdersService {
     };
   }
 
-  async createOrderFromCart(userId: string, addressId: any) {
+  async createOrderFromCart(userId: string, addressId: any, couponId?: string,) {
     const cart = await this.cartService.getCartSummaryByUser(userId);
 
     if (!cart || cart.items.length === 0) {
@@ -123,10 +128,31 @@ export class OrdersService {
     if (!address) {
       throw new Error('Address not found');
     }
+
+    let discount = 0;
+    let couponName: string | null = null;
+
+    if (couponId) {
+      const coupon = await this.couponModel.findById(couponId);
+
+      if (!coupon) {
+        throw new NotFoundException('Coupon not found');
+      }
+
+      couponName = coupon.name || null;
+
+      if (coupon.type === 'flat') {
+        discount = coupon.value;
+      } else if (coupon.type === 'percent') {
+        discount = (cart.total_amount * coupon.value) / 100;
+      }
+    }
     const order = await this.createOrder(userId, {
       items,
       address,
       totalWeight: cart.totalWeight,
+      discount,
+      couponName,
     });
 
     return order;
@@ -257,7 +283,7 @@ export class OrdersService {
 
     const receiver_phone = (order as any)?.address?.receiver_phone;
 
-    // ✅ Case 1: Already paid → send SMS (important)
+
     if (order.paymentStatus === 'paid') {
       if (receiver_phone) {
         this.smsService
@@ -284,7 +310,7 @@ export class OrdersService {
 
     const { status, paymentId, amount } = result;
 
-    // ✅ Case 2: Payment success
+
     if (status === 'succeeded' && paymentId && amount) {
       await this.handlePaymentSuccess(
         orderId,
@@ -292,7 +318,7 @@ export class OrdersService {
         parseFloat(amount),
       );
 
-      // ✅ Send SMS AFTER success
+
       if (receiver_phone) {
         this.smsService
           .sendOrderSuccessSMS(
@@ -306,7 +332,7 @@ export class OrdersService {
       return { status: 'paid', orderId: order.orderId };
     }
 
-    // ❌ Case 3: Failed
+
     await this.handlePaymentFailure(orderId);
 
     return { status: 'failed', orderId: order.orderId };

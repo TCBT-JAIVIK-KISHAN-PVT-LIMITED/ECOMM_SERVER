@@ -12,6 +12,7 @@ import { UsersModule } from '../users/users.module';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { ShippingModule } from '../../integrations/shipping/shipping.module';
 import { SmsService } from './sms.service';
+import { CouponModule } from '../coupon/coupon.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { SmsService } from './sms.service';
     PaymentsModule,
     CartModule,
     ShippingModule,
+    CouponModule
   ],
   controllers: [OrdersController, PaymentsController],
   providers: [OrdersService, SmsService],
