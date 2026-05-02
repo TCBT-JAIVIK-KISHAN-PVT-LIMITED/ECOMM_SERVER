@@ -5,6 +5,7 @@ import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
 import { ZohoModule } from '../../zoho/zoho.module';
 import { ZohoImageSyncModule } from '../../integrations/zoho-image-sync/zoho-image-sync.module';
+import { ZohoCommerceModule } from '../../zoho/commerce/commerce.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ZohoImageSyncModule } from '../../integrations/zoho-image-sync/zoho-ima
     ]),
     ZohoModule,
     ZohoImageSyncModule,
+    ZohoCommerceModule,
   ],
   controllers: [ProductsController],
   providers: [ProductsService],

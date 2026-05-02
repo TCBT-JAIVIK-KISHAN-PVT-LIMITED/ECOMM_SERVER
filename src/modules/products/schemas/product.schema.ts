@@ -63,6 +63,9 @@ export class Product {
 
   @Prop({ default: true })
   is_active!: boolean;
+
+  @Prop({ default: false })
+  show_in_storefront!: boolean;
 }
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
@@ -72,3 +75,4 @@ ProductSchema.index({ category_id: 1 });
 ProductSchema.index({ name: 'text', description: 'text' });
 ProductSchema.index({ is_active: 1 });
 ProductSchema.index({ price: 1 });
+ProductSchema.index({ show_in_storefront: 1 });

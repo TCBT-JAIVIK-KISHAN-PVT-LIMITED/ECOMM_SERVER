@@ -185,6 +185,10 @@ export class ZohoImageSyncService {
         : '',
 
       is_active: true,
+
+      // ✅ New products default to visible; existing products keep their current value.
+      // The daily cron / startup sync will correct this using the Storefront API.
+      ...(isNewProduct ? { show_in_storefront: true } : {}),
     };
 
     const imageName = item?.image_name;

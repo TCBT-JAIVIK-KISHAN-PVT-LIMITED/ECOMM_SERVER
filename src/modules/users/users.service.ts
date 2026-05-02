@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User } from './schemas/user.schema';
 import { CrmService } from '../../zoho/crm/crm.service';
 import { AddAddressDto } from './dto/add-address.dto';
@@ -107,16 +107,17 @@ export class UsersService {
     }
 
     try {
+      const addressObjectId = new Types.ObjectId(addressId);
       const updatedUser = await this.userModel.findOneAndUpdate(
         {
           _id: cleanUserId,
-          'addresses._id': addressId,
+          'addresses._id': addressObjectId,
         },
         {
           $set: {
             'addresses.$': {
               ...updateData,
-              _id: addressId, // preserve ID
+              _id: addressObjectId, // preserve ID
             },
           },
         },
@@ -158,21 +159,36 @@ export class UsersService {
     console.log('Address ID:', addressId);
 
     try {
+      // Get the user first to verify the address exists
+      const user = await this.userModel.findById(userId);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const beforeCount = user.addresses.length;
+
+      // Cast to ObjectId so $pull actually matches the subdocument _id
       const updatedUser = await this.userModel.findByIdAndUpdate(
         userId,
         {
           $pull: {
-            addresses: { _id: addressId },
+            addresses: { _id: new Types.ObjectId(addressId) },
           },
         },
         { new: true }
       );
 
       if (!updatedUser) {
-        throw new Error('User not found');
+        throw new Error('User not found after update');
       }
 
-      console.log('✅ Address removed');
+      const afterCount = updatedUser.addresses.length;
+      if (beforeCount === afterCount) {
+        console.warn('⚠️ Address was NOT removed — ID may not match:', addressId);
+        throw new Error('Address not found or already deleted');
+      }
+
+      console.log(`✅ Address removed (${beforeCount} → ${afterCount})`);
       return updatedUser.addresses;
     } catch (error: any) {
       console.log('❌ DELETE ERROR:', error.message);
