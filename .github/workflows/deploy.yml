@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - main
+      - fix/productsyncissue
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to EC2
+      - name: Deploy Production EC2
+        if: github.ref_name == 'main'
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -20,7 +22,36 @@ jobs:
             cd /home/ubuntu/app-server
 
             echo "📥 Pull latest code"
+            git fetch origin
+            git checkout main
             git pull origin main
+
+            echo "📦 Install dependencies"
+            npm ci
+
+            echo "🏗️ Build project"
+            npm run build
+
+            echo "🔁 Restart PM2"
+            pm2 reload nest-app || pm2 start dist/main.js --name nest-app
+
+            echo "💾 Save PM2"
+            pm2 save
+
+      - name: Deploy Testing EC2
+        if: github.ref_name == 'fix/productsyncissue'
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.TEST_EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.TEST_EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app-server
+
+            echo "📥 Pull latest code"
+            git fetch origin
+            git checkout fix/productsyncissue
+            git pull origin fix/productsyncissue
 
             echo "📦 Install dependencies"
             npm ci
