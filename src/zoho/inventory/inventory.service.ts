@@ -6,75 +6,119 @@ import { ZohoAuthService } from '../core/zoho-auth.service';
 @Injectable()
 export class ZohoInventoryService {
   constructor(
-    private http: ZohoHttpService,
-    private config: ConfigService,
-    private zohoAuthService: ZohoAuthService,
+    private readonly http: ZohoHttpService,
+    private readonly config: ConfigService,
+    private readonly zohoAuthService: ZohoAuthService,
   ) { }
 
-  private getOrgId() {
-    return this.config.get<string>('ZOHO_ORG_ID') || '';
+  private getOrgId(): string {
+    return this.config.getOrThrow<string>('ZOHO_ORG_ID');
   }
 
-  async getItems(page = 1, perPage = 200): Promise<any> {
-    return this.http.request(
-      'GET',
-      `https://www.zohoapis.in/inventory/v1/items?organization_id=${this.getOrgId()}&page=${page}&per_page=${perPage}`,
-      'inventory',
-    );
-  }
-
-  async getItem(itemId: string): Promise<any> {
+  async getItems(page = 1, perPage = 200): Promise<{
+    items: any[];
+    has_more_page: boolean;
+  }> {
     const response = await this.http.request(
       'GET',
-      `https://www.zohoapis.in/inventory/v1/items/${itemId}?organization_id=${this.getOrgId()}`,
+      `https://www.zohoapis.in/inventory/v1/items` +
+      `?organization_id=${this.getOrgId()}&page=${page}&per_page=${perPage}`,
       'inventory',
     );
-
-    return response?.item || null;
+    return {
+      items: response?.items ?? [],
+      has_more_page: response?.page_context?.has_more_page ?? false,
+    };
   }
 
-  async downloadItemImage(itemId: string): Promise<Buffer> {
-    return this.http.request(
+  async getAllItems(): Promise<any[]> {
+    const all: any[] = [];
+    let page = 1;
+
+    while (true) {
+      const { items, has_more_page } = await this.getItems(page, 200);
+      all.push(...items);
+      if (!has_more_page) break;
+      page++;
+    }
+
+    return all;
+  }
+
+  async getItem(itemId: string): Promise<any | null> {
+    const response = await this.http.request(
       'GET',
-      `https://www.zohoapis.in/inventory/v1/items/${itemId}/image?organization_id=${this.getOrgId()}`,
+      `https://www.zohoapis.in/inventory/v1/items/${itemId}` +
+      `?organization_id=${this.getOrgId()}`,
       'inventory',
-      undefined,
-      { responseType: 'arraybuffer' },
     );
+    return response?.item ?? null;
   }
 
-  async getItemImageUploadPayload(itemId: string, existingHash?: string) {
-    const imageUrl = `https://www.zohoapis.in/inventory/v1/items/${itemId}/image?organization_id=${this.getOrgId()}`;
-    const token = await this.zohoAuthService.getValidAccessToken('inventory');
+  async getItemImageMeta(
+    itemId: string,
+  ): Promise<{
+    imageUrl: string;
+    zohoToken: string;
+  } | null> {
+
+    const imageUrl =
+      `https://www.zohoapis.in/inventory/v1/items/${itemId}/image` +
+      `?organization_id=${this.getOrgId()}`;
+
     try {
-      await this.http.request('GET', imageUrl, 'inventory', undefined, {
-        responseType: 'stream',
-      });
+
+      // lightweight stream probe
+      const stream =
+        await this.http.request(
+          'GET',
+          imageUrl,
+          'inventory',
+          undefined,
+          {
+            responseType: 'stream',
+          },
+        );
+
+      // destroy immediately
+      stream?.cancel?.();
+
     } catch (err: any) {
-      if (err?.response?.status === 400 || err?.response?.status === 404) {
-        throw new Error(`NO_IMAGE: Item ${itemId} has no image in Zoho`);
+
+      const status =
+        err?.response?.status;
+
+      if (
+        status === 400 ||
+        status === 404
+      ) {
+        return null;
       }
+
       throw err;
     }
 
-    return { imageUrl, itemId, zohoToken: token, existingHash };
+    const zohoToken =
+      await this.zohoAuthService
+        .getValidAccessToken('inventory');
+
+    return {
+      imageUrl,
+      zohoToken,
+    };
   }
 
-  async createSalesOrder(order: any, customerId: string) {
+  async createSalesOrder(order: any, customerId: string): Promise<string> {
     const payload = {
       customer_id: customerId,
-
       reference_number: order.orderId,
-
       line_items: order.items.map((item: any) => ({
         item_id: item.zohoItemId,
         name: item.name,
         rate: item.price,
         quantity: item.quantity,
       })),
-
       shipping_charge: order.shippingCharge,
-
       billing_address: {
         address: order.address.addressLine,
         city: order.address.city,
@@ -82,7 +126,6 @@ export class ZohoInventoryService {
         zip: order.address.pincode,
         phone: order.address.phone,
       },
-
       shipping_address: {
         address: order.address.addressLine,
         city: order.address.city,
@@ -94,7 +137,8 @@ export class ZohoInventoryService {
 
     const response = await this.http.request(
       'POST',
-      `https://www.zohoapis.in/inventory/v1/salesorders?organization_id=${this.getOrgId()}`,
+      `https://www.zohoapis.in/inventory/v1/salesorders` +
+      `?organization_id=${this.getOrgId()}`,
       'inventory',
       payload,
     );

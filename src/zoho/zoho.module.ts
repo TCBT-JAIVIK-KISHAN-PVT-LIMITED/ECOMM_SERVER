@@ -8,14 +8,12 @@ import { ZohoAuthService } from './core/zoho-auth.service';
 import { ZohoHttpService } from './core/zoho-http.service';
 import { CrmService } from './crm/crm.service';
 import { ZohoInventoryService } from './inventory/inventory.service';
-import { ZohoCommerceModule } from './commerce/commerce.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: ZohoToken.name, schema: ZohoTokenSchema },
     ]),
-    ZohoCommerceModule,
   ],
   providers: [
     ZohoAuthService,
@@ -23,7 +21,7 @@ import { ZohoCommerceModule } from './commerce/commerce.module';
     CrmService,
     ZohoInventoryService,
   ],
-  exports: [CrmService, ZohoInventoryService, ZohoAuthService, ZohoCommerceModule],
+  exports: [CrmService, ZohoInventoryService, ZohoAuthService],
 })
 export class ZohoModule {}
 

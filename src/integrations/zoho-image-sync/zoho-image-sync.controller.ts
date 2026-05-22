@@ -1,135 +1,216 @@
-import { Controller, Post, Body, HttpCode, Logger, Headers } from '@nestjs/common';
-import { ZohoImageSyncService } from './zoho-image-sync.service';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  Logger,
+  Post,
+} from '@nestjs/common';
+
 import { ConfigService } from '@nestjs/config';
+
+import { ProductSyncService } from '../../modules/products/product-sync.service';
 
 @Controller('zoho')
 export class ZohoImageSyncController {
-  private readonly logger = new Logger(ZohoImageSyncController.name);
+  private readonly logger = new Logger(
+    ZohoImageSyncController.name,
+  );
+
   private processingItems = new Set<string>();
 
   constructor(
-    private readonly zohoImageSyncService: ZohoImageSyncService,
+    private readonly productSyncService: ProductSyncService,
     private readonly configService: ConfigService,
-  ) { }
+  ) {}
 
-  // ✅ Validate webhook secret token
+  // ─────────────────────────────────────────
+  // Validate webhook token
+  // ─────────────────────────────────────────
   private validateToken(token: string): boolean {
-    const expected = this.configService.get('ZOHO_WEBHOOK_SECRET');
+    const expected =
+      this.configService.get<string>(
+        'ZOHO_WEBHOOK_SECRET',
+      );
+
     if (expected && token !== expected) {
-      this.logger.warn('⛔ Invalid webhook token — request rejected');
+      this.logger.warn(
+        '⛔ Invalid webhook token',
+      );
       return false;
     }
+
     return true;
   }
 
-  // ✅ Extract item_id from any payload format
+  // ─────────────────────────────────────────
+  // Extract item_id safely
+  // ─────────────────────────────────────────
   private extractItemId(body: any): string | null {
-    const payload = body?.JSONString ? JSON.parse(body.JSONString) : body;
-    return payload?.item_id || payload?.itemId || payload?.id || null;
+    try {
+      const payload = body?.JSONString
+        ? JSON.parse(body.JSONString)
+        : body;
+
+      return (
+        payload?.item_id ||
+        payload?.itemId ||
+        payload?.id ||
+        null
+      );
+    } catch {
+      return null;
+    }
   }
 
-  // ✅ Duplicate guard
-  private isAlreadyProcessing(itemId: string): boolean {
+  // ─────────────────────────────────────────
+  // Duplicate processing guard
+  // ─────────────────────────────────────────
+  private isAlreadyProcessing(
+    itemId: string,
+  ): boolean {
     if (this.processingItems.has(itemId)) {
-      this.logger.warn(`⚠️ Already processing ${itemId} — ignored`);
+      this.logger.warn(
+        `⚠️ Already processing ${itemId}`,
+      );
+
       return true;
     }
+
     return false;
   }
 
-  // ✅ Item CREATED
+  // ─────────────────────────────────────────
+  // CREATED
+  // ─────────────────────────────────────────
   @Post('webhook/created')
   @HttpCode(200)
-  async handleItemCreated(
+  async handleCreated(
     @Body() body: any,
-    @Headers('x-zoho-webhook-token') token: string,
+    @Headers('x-zoho-webhook-token')
+    token: string,
   ) {
-    if (!this.validateToken(token)) return { status: 'rejected' };
-
-    const itemId = this.extractItemId(body);
-    this.logger.log(`📩 [CREATED] item_id: ${itemId}`);
-
-    if (!itemId) return { status: 'ignored', reason: 'no item_id' };
-    if (this.isAlreadyProcessing(itemId)) return { status: 'ignored', reason: 'already processing' };
-
-    this.processingItems.add(itemId);
-    this.zohoImageSyncService
-      .syncItemImage(String(itemId))
-      .catch((err) => this.logger.error(`Create sync failed: ${err.message}`))
-      .finally(() => this.processingItems.delete(itemId));
-
-    return { status: 'received', action: 'create', itemId };
+    return this.processWebhook(
+      body,
+      token,
+      'created',
+    );
   }
 
-  // ✅ Item UPDATED
+  // ─────────────────────────────────────────
+  // UPDATED
+  // ─────────────────────────────────────────
   @Post('webhook/updated')
   @HttpCode(200)
-  async handleItemUpdated(
+  async handleUpdated(
     @Body() body: any,
-    @Headers('x-zoho-webhook-token') token: string,
+    @Headers('x-zoho-webhook-token')
+    token: string,
   ) {
-    if (!this.validateToken(token)) return { status: 'rejected' };
-
-    const itemId = this.extractItemId(body);
-    this.logger.log(`📩 [UPDATED] item_id: ${itemId}`);
-
-    if (!itemId) return { status: 'ignored', reason: 'no item_id' };
-    if (this.isAlreadyProcessing(itemId)) return { status: 'ignored', reason: 'already processing' };
-
-    this.processingItems.add(itemId);
-    this.zohoImageSyncService
-      .syncItemImage(String(itemId))
-      .catch((err) => this.logger.error(`Update sync failed: ${err.message}`))
-      .finally(() => this.processingItems.delete(itemId));
-
-    return { status: 'received', action: 'update', itemId };
+    return this.processWebhook(
+      body,
+      token,
+      'updated',
+    );
   }
 
-  // ✅ Item DELETED — no extra Zoho API call needed
+  // ─────────────────────────────────────────
+  // DELETED
+  // ─────────────────────────────────────────
   @Post('webhook/deleted')
   @HttpCode(200)
-  async handleItemDeleted(
+  async handleDeleted(
     @Body() body: any,
-    @Headers('x-zoho-webhook-token') token: string,
+    @Headers('x-zoho-webhook-token')
+    token: string,
   ) {
-    if (!this.validateToken(token)) return { status: 'rejected' };
-
-    const itemId = this.extractItemId(body);
-    this.logger.log(`📩 [DELETED] item_id: ${itemId}`);
-
-    if (!itemId) return { status: 'ignored', reason: 'no item_id' };
-    if (this.isAlreadyProcessing(itemId)) return { status: 'ignored', reason: 'already processing' };
-
-    this.processingItems.add(itemId);
-    this.zohoImageSyncService
-      .deleteItem(String(itemId))
-      .catch((err) => this.logger.error(`Delete failed: ${err.message}`))
-      .finally(() => this.processingItems.delete(itemId));
-
-    return { status: 'received', action: 'delete', itemId };
+    return this.processWebhook(
+      body,
+      token,
+      'deleted',
+    );
   }
 
-  // ✅ Fallback — old single webhook still works
+  // ─────────────────────────────────────────
+  // FALLBACK
+  // ─────────────────────────────────────────
   @Post('webhook')
   @HttpCode(200)
-  async handleItemSync(
+  async handleFallback(
     @Body() body: any,
-    @Headers('x-zoho-webhook-token') token: string,
+    @Headers('x-zoho-webhook-token')
+    token: string,
   ) {
-    if (!this.validateToken(token)) return { status: 'rejected' };
+    return this.processWebhook(
+      body,
+      token,
+      'fallback',
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // MAIN PROCESSOR
+  // ─────────────────────────────────────────
+  private async processWebhook(
+    body: any,
+    token: string,
+    event: string,
+  ) {
+    if (!this.validateToken(token)) {
+      return {
+        status: 'rejected',
+      };
+    }
 
     const itemId = this.extractItemId(body);
-    this.logger.log(`📩 [FALLBACK] item_id: ${itemId}`);
 
-    if (!itemId) return { status: 'ignored', reason: 'no item_id' };
-    if (this.isAlreadyProcessing(itemId)) return { status: 'ignored', reason: 'already processing' };
+    this.logger.log(
+      `📩 [${event.toUpperCase()}] item_id: ${itemId}`,
+    );
+
+    if (!itemId) {
+      return {
+        status: 'ignored',
+        reason: 'no item_id',
+      };
+    }
+
+    if (this.isAlreadyProcessing(itemId)) {
+      return {
+        status: 'ignored',
+        reason: 'already processing',
+      };
+    }
 
     this.processingItems.add(itemId);
-    this.zohoImageSyncService
-      .syncItemImage(String(itemId))
-      .catch((err) => this.logger.error(`Sync failed: ${err.message}`))
-      .finally(() => this.processingItems.delete(itemId));
 
-    return { status: 'received', action: 'sync', itemId };
+    try {
+      if (event === 'deleted') {
+        await this.productSyncService.deleteByZohoItemId(
+          String(itemId),
+        );
+      } else {
+        await this.productSyncService.syncSingleItem(
+          String(itemId),
+        );
+      }
+
+      return {
+        status: 'success',
+        event,
+        itemId,
+      };
+    } catch (err: any) {
+      this.logger.error(
+        `❌ Webhook processing failed: ${err.message}`,
+      );
+
+      return {
+        status: 'failed',
+        error: err.message,
+      };
+    } finally {
+      this.processingItems.delete(itemId);
+    }
   }
 }

@@ -1,5 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+
+export type UserDocument = HydratedDocument<User>;
 
 @Schema({ _id: false })
 class OTP {
@@ -49,7 +51,9 @@ class Address {
     updatedAt: 'updated_at',
   },
 })
-export class User extends Document {
+export class User {
+  _id!: Types.ObjectId;
+
   @Prop({ required: true, unique: true })
   mobile_number!: string;
 

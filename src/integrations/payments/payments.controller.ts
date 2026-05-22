@@ -11,6 +11,8 @@ import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { OrdersService } from '../../modules/orders/orders.service';
+import { ZohoPaymentLinksService } from './zoho-payment-links.service';
+import { CreatePaymentLinkDto } from './dto/create-payment-link.dto';
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
@@ -21,6 +23,7 @@ export class PaymentsController {
   constructor(
     private readonly ordersService: OrdersService,
     private readonly configService: ConfigService,
+    private readonly zohoPaymentLinksService: ZohoPaymentLinksService,
   ) { }
 
   @Post('webhook')
@@ -90,5 +93,14 @@ export class PaymentsController {
   @Get('verify/:orderId')
   async verifyPayment(@Param('orderId') orderId: string) {
     return this.ordersService.verifyAndConfirmOrder(orderId);
+  }
+
+  @Post('payment-link')
+  async createPaymentLink(
+    @Body() body: CreatePaymentLinkDto,
+  ) {
+    return this.zohoPaymentLinksService.createPaymentLink(
+      body,
+    );
   }
 }
