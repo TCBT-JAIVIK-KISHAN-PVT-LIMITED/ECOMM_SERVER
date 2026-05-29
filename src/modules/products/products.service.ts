@@ -2,7 +2,6 @@ import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Product } from './schemas/product.schema';
-
 export interface ProductFilterQuery {
   page?: number;
   limit?: number;
@@ -12,6 +11,16 @@ export interface ProductFilterQuery {
   search?: string;
   hasVariants?: boolean;
 }
+
+type ProductMongoFilter = {
+  is_active: boolean;
+  $or?: Array<Record<string, unknown>>;
+  price?: {
+    $gte?: number;
+    $lte?: number;
+  };
+  has_variants?: boolean;
+};
 
 /**
  * ProductsService — frontend / consumer-facing queries ONLY.
@@ -106,9 +115,9 @@ export class ProductsService {
     const safePage = Math.max(1, Number(page));
     const safeLimit = Math.min(Math.max(1, Number(limit)), 50);
 
-    const filter: Record<string, any> = {
-      is_active: true,
-    };
+const filter: ProductMongoFilter = {
+  is_active: true,
+};
 
     if (category) {
       filter.$or = [
