@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron } from '@nestjs/schedule';
 import { Model } from 'mongoose';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { Product } from './schemas/product.schema';
 import { ZohoInventoryService } from '../../zoho/inventory/inventory.service';
@@ -85,6 +87,44 @@ function extractAttributeNames(items: ZohoItem[]): string[] {
     return [...names];
 }
 
+// ─── SKU Whitelist — loaded from config/sku-whitelist.json ──────────────────
+function loadAllowedSkus(): Set<string> {
+    try {
+        const configPath = path.resolve(process.cwd(), 'config', 'sku-whitelist.json');
+        const raw = fs.readFileSync(configPath, 'utf-8');
+        const config = JSON.parse(raw);
+        const skus = new Set<string>(config.skus || []);
+        console.log(`[SKU Whitelist] Loaded ${skus.size} SKUs from ${configPath}`);
+        return skus;
+    } catch (err: any) {
+        console.error(`[SKU Whitelist] Failed to load config: ${err.message}. No products will be whitelisted.`);
+        return new Set<string>();
+    }
+}
+
+const ALLOWED_SKUS = loadAllowedSkus();
+
+/**
+ * Check if an item's SKU matches the whitelist.
+ * Handles variant SKUs like "1001-A" by checking the base prefix.
+ */
+function isSkuAllowed(sku: string | undefined): boolean {
+    if (!sku) return false;
+    const trimmed = sku.trim();
+    if (ALLOWED_SKUS.has(trimmed)) return true;
+    const base = trimmed.split('-')[0].trim();
+    if (ALLOWED_SKUS.has(base)) return true;
+    return false;
+}
+
+/**
+ * Check if a product group should be synced.
+ * Returns true if ANY item in the group has an allowed SKU.
+ */
+function isGroupAllowed(items: ZohoItem[]): boolean {
+    return items.some((item) => isSkuAllowed(item.sku));
+}
+
 function shouldSyncItem(item: ZohoItem): boolean {
 
     if (item.status !== 'active') {
@@ -95,11 +135,16 @@ function shouldSyncItem(item: ZohoItem): boolean {
         return false;
     }
 
-    if (!item.category_id || !item.category_name) {
+    if (!item.sku || item.sku.trim().length < 2) {
         return false;
     }
 
-    if (!item.sku || item.sku.trim().length < 2) {
+    // Whitelisted SKUs bypass category/stock/price/image checks
+    if (isSkuAllowed(item.sku)) {
+        return true;
+    }
+
+    if (!item.category_id || !item.category_name) {
         return false;
     }
 
@@ -187,7 +232,7 @@ function buildProductFromGroup(
             ? groupName
             : primary.name,
 
-        description: primary.description ?? '',
+        description: items.find((i) => i.description?.trim())?.description ?? primary.description ?? '',
 
         sku: primary.sku ?? '',
 
@@ -259,6 +304,27 @@ export class ProductSyncService {
             const allItems: ZohoItem[] = await this.zohoInventoryService.getAllItems();
             this.logger.log(`📦 Fetched ${allItems.length} items from Zoho`);
 
+            // DEBUG: Log sample SKUs to understand the format
+            const sampleSkus = allItems.slice(0, 20).map((i) => i.sku).filter(Boolean);
+            this.logger.log(`🔍 Sample SKUs from Zoho: ${JSON.stringify(sampleSkus)}`);
+            const allSkus = allItems.map((i) => i.sku).filter(Boolean);
+            const matchingSkus = allSkus.filter((s) => isSkuAllowed(s));
+            this.logger.log(`🔍 Total SKUs: ${allSkus.length}, Matching whitelist: ${matchingSkus.length}`);
+
+            // DEBUG: Log WHY whitelisted items are rejected
+            for (const item of allItems) {
+                if (!isSkuAllowed(item.sku)) continue;
+                if (shouldSyncItem(item)) continue;
+                const stock = toNum(item.actual_available_stock ?? item.available_stock ?? item.stock_on_hand);
+                const reasons: string[] = [];
+                if (item.status !== 'active') reasons.push('inactive');
+                if (item.item_type !== 'inventory') reasons.push(`type=${item.item_type}`);
+                if (!item.category_id) reasons.push('no_category');
+                if (stock < 1) reasons.push(`stock=${stock}`);
+                if (toNum(item.rate) <= 0) reasons.push(`price=${item.rate}`);
+                if (!item.image_document_id) reasons.push('no_image');
+                this.logger.warn(`⚠️ SKU ${item.sku} (${item.name}) REJECTED: ${reasons.join(', ')}`);
+            }
 
             const validItems = allItems.filter(
                 shouldSyncItem,
@@ -271,18 +337,23 @@ export class ProductSyncService {
             const grouped = this.groupItems(validItems);
             this.logger.log(`🗂️  Resolved to ${grouped.size} products (grouped + standalone)`);
 
+            // Filter groups by SKU whitelist
+            const allowedGroups = [...grouped.entries()].filter(
+                ([, { items }]) => isGroupAllowed(items),
+            );
+            this.logger.log(`🔑 ${allowedGroups.length} products match SKU whitelist`);
 
             let synced = 0;
             let failed = 0;
             const seenProductIds = new Set<string>();
 
-            for (const [productId, { groupId, groupName, items, isVariant }] of grouped) {
+            for (const [productId, { groupId, groupName, items, isVariant }] of allowedGroups) {
                 try {
                     await this.syncOneProduct(productId, groupId, groupName, items, isVariant);
                     seenProductIds.add(productId);
                     synced++;
 
-                    await new Promise((r) => setTimeout(r, 200));
+                    await new Promise((r) => setTimeout(r, 1000));
                 } catch (err: any) {
                     this.logger.error(`❌ Failed to sync product ${productId}: ${err.message}`);
                     failed++;
@@ -476,12 +547,17 @@ export class ProductSyncService {
                     (v: any) => v.zoho_item_id === String(item.item_id),
                 );
 
-                const imageMeta = await this.zohoImageSyncService.syncImageForItem(
-                    String(item.item_id),
-                    item.image_name,
-                    existingVariant?.image ?? null,
-                );
-                productData.variants[variantIdx].image = imageMeta;
+                try {
+                    const imageMeta = await this.zohoImageSyncService.syncImageForItem(
+                        String(item.item_id),
+                        item.image_name,
+                        existingVariant?.image ?? null,
+                    );
+                    productData.variants[variantIdx].image = imageMeta;
+                } catch (imgErr: any) {
+                    this.logger.warn(`⚠️ Image sync failed for variant ${item.item_id} (${item.sku}), saving without image: ${imgErr?.message}`);
+                    productData.variants[variantIdx].image = existingVariant?.image ?? null;
+                }
             }
 
 
@@ -492,17 +568,36 @@ export class ProductSyncService {
         } else {
 
             const singleItem = items[0];
-            const imageMeta = await this.zohoImageSyncService.syncImageForItem(
-                String(singleItem.item_id),
-                singleItem.image_name,
-                (existing as any)?.image ?? null,
-            );
-            productData.image = imageMeta;
-            if (productData.variants[0]) {
-                productData.variants[0].image = imageMeta;
+            try {
+                const imageMeta = await this.zohoImageSyncService.syncImageForItem(
+                    String(singleItem.item_id),
+                    singleItem.image_name,
+                    (existing as any)?.image ?? null,
+                );
+                productData.image = imageMeta;
+                if (productData.variants[0]) {
+                    productData.variants[0].image = imageMeta;
+                }
+            } catch (imgErr: any) {
+                this.logger.warn(`⚠️ Image sync failed for ${singleItem.item_id} (${singleItem.sku}), saving without image: ${imgErr?.message}`);
+                productData.image = (existing as any)?.image ?? null;
+                if (productData.variants[0]) {
+                    productData.variants[0].image = (existing as any)?.variants?.[0]?.image ?? null;
+                }
             }
         }
 
+
+        // Preserve existing is_active flag — don't let the sync re-activate
+        // products that were manually deactivated via the whitelist script.
+        if (existing) {
+            productData.is_active = (existing as any).is_active;
+
+            // Preserve existing description if sync produces empty description
+            if (!productData.description && (existing as any).description) {
+                productData.description = (existing as any).description;
+            }
+        }
 
         await this.productModel.findOneAndUpdate(
             { zoho_item_id: productId },

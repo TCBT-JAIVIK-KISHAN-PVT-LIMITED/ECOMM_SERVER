@@ -101,25 +101,16 @@ export class OrdersService {
       throw new Error('Cart is empty');
     }
 
-    const items = await Promise.all(
-      cart.items.map(async (item: any) => {
-        const product = await this.productModel.findById(item.product_id);
-
-        if (!product) {
-          throw new Error(`Product not found: ${item.product_id}`);
-        }
-
-        return {
-          productId: product._id,
-          name: product.name,
-          price: product.price,
-          quantity: item.quantity,
-          weight: product.weight || 1,
-          image: product.image?.image_url,
-          zohoItemId: product.zoho_item_id,
-        };
-      }),
-    );
+    const items = cart.items.map((item: any) => {
+      return {
+        productId: item.product_id,
+        name: item.name || 'Unknown Product',
+        price: item.price || 0,
+        quantity: item.quantity,
+        weight: item.weight || 100,
+        image: item.image_url || null,
+      };
+    });
     const address = await this.usersService.findAddressById(
       userId,
       addressId,

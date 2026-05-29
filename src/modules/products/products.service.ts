@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import type { FilterQuery } from 'mongoose';
 import { Product } from './schemas/product.schema';
 
 export interface ProductFilterQuery {
@@ -37,7 +36,7 @@ export class ProductsService {
       .find({ is_active: true })
       .select(
         'name price label_rate stock description image category_name ' +
-        'has_variants variant_attribute_names brand sku',
+        'has_variants variant_attribute_names variants brand sku',
       )
       .lean();
 
@@ -51,14 +50,42 @@ export class ProductsService {
   // Get single product by MongoDB _id or zoho_item_id
   // ─────────────────────────────────────────
   async getProductById(id: string) {
+    // Build $or conditions — only include _id if it's a valid ObjectId
+    // to avoid Mongoose CastError when id is a zoho_item_id string
+    const { Types } = await import('mongoose');
+    const orConditions: Record<string, any>[] = [{ zoho_item_id: id }];
+    if (Types.ObjectId.isValid(id) && String(new Types.ObjectId(id)) === id) {
+      orConditions.unshift({ _id: id });
+    }
+
     const product = await this.productModel
       .findOne({
-        $or: [{ _id: id }, { zoho_item_id: id }],
+        $or: orConditions,
         is_active: true,
       })
       .lean();
 
     if (!product) throw new NotFoundException('Product not found');
+
+    // If product has no description, try to find one from a related product
+    // (same base name or same group_id)
+    if (!product.description && product.name) {
+      // Extract base name (e.g. "NEEM BAAN" from "NEEM BAAN (100ml-250ml-500ml)")
+      const baseName = product.name.replace(/\s*\(.*\)\s*$/, '').trim();
+      const related = await this.productModel
+        .findOne({
+          is_active: true,
+          description: { $ne: '', $exists: true },
+          name: { $regex: `^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, $options: 'i' },
+        })
+        .select('description')
+        .lean();
+
+      if (related?.description) {
+        (product as any).description = related.description;
+      }
+    }
+
     return product;
   }
 
@@ -79,7 +106,7 @@ export class ProductsService {
     const safePage = Math.max(1, Number(page));
     const safeLimit = Math.min(Math.max(1, Number(limit)), 50);
 
-    const filter: FilterQuery<Product> = {
+    const filter: Record<string, any> = {
       is_active: true,
     };
 
@@ -121,7 +148,7 @@ export class ProductsService {
         .limit(safeLimit)
         .select(
           'name price label_rate stock image category_name has_variants ' +
-          'variant_attribute_names variants brand sku description',
+          'variant_attribute_names variants brand sku description weight weight_unit',
         )
         .lean(),
       this.productModel.countDocuments(filter),

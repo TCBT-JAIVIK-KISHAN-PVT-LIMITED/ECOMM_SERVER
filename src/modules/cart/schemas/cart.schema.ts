@@ -3,8 +3,8 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class CartItem {
-  @Prop({ type: Types.ObjectId, ref: 'Product', required: true })
-  product_id: Types.ObjectId;
+  @Prop({ type: String, required: true })
+  product_id: string;
 
   @Prop({ required: true, min: 1 })
   quantity: number;
