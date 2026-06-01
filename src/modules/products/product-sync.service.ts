@@ -430,6 +430,12 @@ export class ProductSyncService {
                 (i: ZohoItem) => i.group_id === item.group_id,
             );
 
+            // SKU whitelist check — reject groups where no variant has an allowed SKU
+            if (!isGroupAllowed(siblings)) {
+                this.logger.warn(`⚠️ Webhook item ${zohoItemId} (SKU ${item.sku}) — group not in whitelist, skipping`);
+                return;
+            }
+
             await this.syncOneProduct(
                 item.group_id,
                 item.group_id,
@@ -441,6 +447,12 @@ export class ProductSyncService {
 
 
         else {
+            // SKU whitelist check — reject standalone items not in the whitelist
+            if (!isSkuAllowed(item.sku)) {
+                this.logger.warn(`⚠️ Webhook item ${zohoItemId} (SKU ${item.sku}) not in whitelist, skipping`);
+                return;
+            }
+
             await this.syncOneProduct(
                 zohoItemId,
                 '',
