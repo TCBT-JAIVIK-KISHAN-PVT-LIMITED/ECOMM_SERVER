@@ -290,10 +290,15 @@ export class OrdersService {
     }
   }
 
-  async verifyAndConfirmOrder(orderId: string): Promise<any> {
+  async verifyAndConfirmOrder(orderId: string, userId?: string): Promise<any> {
     const order = await this.orderModel.findOne({ orderId });
 
     if (!order) throw new NotFoundException('Order not found');
+
+    // Ownership check — if userId is provided, verify the caller owns this order
+    if (userId && order.userId !== userId) {
+      throw new NotFoundException('Order not found');
+    }
 
     console.log('🔍 Order found:', {
       orderId: order?.orderId,

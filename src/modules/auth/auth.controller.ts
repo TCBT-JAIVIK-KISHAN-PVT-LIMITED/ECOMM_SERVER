@@ -13,7 +13,7 @@ export class AuthController {
   }
 
   @Post('verify-otp')
-  verifyOtp(@Body() dto: any) {
+  verifyOtp(@Body() dto: VerifyOtpDto) {
     return this.authService.verifyOtp({
       mobile_number: dto.mobile_number,
       otp: dto.otp,

@@ -6,6 +6,8 @@ import {
   UnauthorizedException,
   Get,
   Param,
+  UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +15,9 @@ import * as crypto from 'crypto';
 import { OrdersService } from '../../modules/orders/orders.service';
 import { ZohoPaymentLinksService } from './zoho-payment-links.service';
 import { CreatePaymentLinkDto } from './dto/create-payment-link.dto';
+import { JwtAuthGuard } from '../../modules/auth/jwt-auth.guard';
+import { CurrentUser } from '../../modules/auth/current-user.decorator';
+import type { AuthenticatedRequestUser } from '../../modules/auth/jwt.strategy';
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
@@ -20,6 +25,8 @@ interface RawBodyRequest extends Request {
 
 @Controller('payments')
 export class PaymentsController {
+  private readonly logger = new Logger(PaymentsController.name);
+
   constructor(
     private readonly ordersService: OrdersService,
     private readonly configService: ConfigService,
@@ -77,20 +84,22 @@ export class PaymentsController {
       .update(rawBody)
       .digest('base64'); // ✅ Zoho sends base64, not hex
 
-    console.log('Expected (base64):', expectedHash);
-    console.log('Received:', signature);
-
     return crypto.timingSafeEqual(
       Buffer.from(expectedHash),
       Buffer.from(signature),
     );
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('verify/:orderId')
-  async verifyPayment(@Param('orderId') orderId: string) {
-    return this.ordersService.verifyAndConfirmOrder(orderId);
+  async verifyPayment(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: AuthenticatedRequestUser,
+  ) {
+    return this.ordersService.verifyAndConfirmOrder(orderId, user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post('payment-link')
   async createPaymentLink(@Body() body: CreatePaymentLinkDto) {
     return this.zohoPaymentLinksService.createPaymentLink(body);

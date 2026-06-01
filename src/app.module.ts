@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ZohoModule } from './zoho/zoho.module';
@@ -17,10 +18,15 @@ import { WishlistModule } from './modules/wishlist/wishlist.module';
 import { ZohoImageSyncModule } from './integrations/zoho-image-sync/zoho-image-sync.module';
 import { ZohoPaymentsModule } from './zoho/payments/payments.module';
 import { ShippingModule } from './integrations/shipping/shipping.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,   // 60 seconds window
+      limit: 100,   // max 100 requests per window per IP
+    }]),
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -42,6 +48,12 @@ import { ShippingModule } from './integrations/shipping/shipping.module';
     ShippingModule,
   ],
   controllers: [AppController, CallbackController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

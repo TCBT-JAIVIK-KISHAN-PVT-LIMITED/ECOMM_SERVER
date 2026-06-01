@@ -23,22 +23,29 @@ async function bootstrap() {
     }),
   );
 
-  // 🌍 CORS
+  // 🌍 CORS — restricted to known origins only
   app.enableCors({
-    origin: '*', // restrict later
+    origin: [
+      'https://tcbtjaivikkisan.com',
+      'https://www.tcbtjaivikkisan.com',
+      'https://admin.tcbtjaivikkisan.com',
+      'https://api.tcbtjaivikkisan.com',
+    ],
     credentials: true,
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('My API')
-    .setDescription('Interactive API documentation')
-    .setVersion('1.0')
-    .addBearerAuth() // if using JWT
-    .build();
+  // 📄 Swagger — only available in development
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('TCBT API')
+      .setDescription('Interactive API documentation')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-
-  SwaggerModule.setup('api-docs', app, document);
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document);
+  }
 
   // 🔥 CRITICAL: RAW BODY for Zoho webhook ONLY
   app.use('/payments/webhook', bodyParser.raw({ type: '*/*' }));

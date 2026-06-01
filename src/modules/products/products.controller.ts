@@ -2,15 +2,18 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Query,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { isValidObjectId } from 'mongoose';
 
 import { ProductsService } from './products.service';
 import { ProductSyncService } from './product-sync.service';
+import { FilterProductsDto } from './dto/filter-products.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -18,6 +21,17 @@ export class ProductsController {
     private readonly productsService: ProductsService,
     private readonly productSyncService: ProductSyncService,
   ) {}
+
+  /**
+   * Validates the admin API key from request headers.
+   * Used to protect internal/admin-only endpoints.
+   */
+  private validateAdminKey(key: string | undefined) {
+    const expected = process.env.ADMIN_API_KEY;
+    if (!expected || !key || key !== expected) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+  }
 
   // ─────────────────────────────────────────
   // Get all active products
@@ -28,10 +42,11 @@ export class ProductsController {
   }
 
   // ─────────────────────────────────────────
-  // Manual full sync trigger
+  // Manual full sync trigger (admin-only)
   // ─────────────────────────────────────────
   @Post('sync-all-now')
-  async syncAllNow() {
+  async syncAllNow(@Headers('x-admin-key') adminKey: string) {
+    this.validateAdminKey(adminKey);
     await this.productSyncService.syncAllProducts();
 
     return {
@@ -41,11 +56,14 @@ export class ProductsController {
   }
 
   // ─────────────────────────────────────────
-  // Sync single product by Zoho item ID
-  // Useful for testing webhooks manually
+  // Sync single product by Zoho item ID (admin-only)
   // ─────────────────────────────────────────
   @Post('sync/:zohoItemId')
-  async syncSingleProduct(@Param('zohoItemId') zohoItemId: string) {
+  async syncSingleProduct(
+    @Param('zohoItemId') zohoItemId: string,
+    @Headers('x-admin-key') adminKey: string,
+  ) {
+    this.validateAdminKey(adminKey);
     await this.productSyncService.syncSingleItem(zohoItemId);
 
     return {
@@ -69,10 +87,10 @@ export class ProductsController {
   }
 
   // ─────────────────────────────────────────
-  // Filtered products
+  // Filtered products (with validated DTO)
   // ─────────────────────────────────────────
   @Get('/filter')
-  async getFilteredProducts(@Query() query: any) {
+  async getFilteredProducts(@Query() query: FilterProductsDto) {
     return this.productsService.getFilteredProducts(query);
   }
 
