@@ -23,16 +23,16 @@ async function bootstrap() {
     }),
   );
 
-  // 🌍 CORS — restricted to known origins only
-  app.enableCors({
-    origin: [
-      'https://tcbtjaivikkisan.com',
-      'https://www.tcbtjaivikkisan.com',
-      'https://admin.tcbtjaivikkisan.com',
-      'https://api.tcbtjaivikkisan.com',
-    ],
-    credentials: true,
-  });
+  // // 🌍 CORS — restricted to known origins only
+  // app.enableCors({
+  //   origin: [
+  //     'https://tcbtjaivikkisan.com',
+  //     'https://www.tcbtjaivikkisan.com',
+  //     'https://admin.tcbtjaivikkisan.com',
+  //     'https://api.tcbtjaivikkisan.com',
+  //   ],
+  //   credentials: true,
+  // });
 
   // 📄 Swagger — only available in development
   if (process.env.NODE_ENV !== 'production') {
