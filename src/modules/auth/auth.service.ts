@@ -96,6 +96,37 @@ export class AuthService {
     const mobile = this.normalizeMobile(mobile_number);
     const r = this.getRedis();
 
+    // ─── Play Store / Test bypass ────────────────────────────────────────────
+    const testMobile = (process.env.TEST_MOBILE ?? '').trim();
+    const testOtp = (process.env.TEST_OTP ?? '').trim();
+    if (testMobile && testOtp && mobile === testMobile) {
+      // Ensure user record exists, skip SMS entirely
+      let testUser = await this.userModel.findOne({ mobile_number: mobile });
+      if (!testUser) {
+        testUser = await this.userModel.create({ mobile_number: mobile });
+      }
+      const testHash = await bcrypt.hash(testOtp, 10);
+      testUser.otp = {
+        code: testHash,
+        expires_at: new Date(Date.now() + OTP_TTL_SEC * 1000),
+        attempts: 0,
+      };
+      await testUser.save();
+      try {
+        if (r) {
+          await r.set(
+            otpKey(mobile),
+            JSON.stringify({ hash: testHash, attempts: 0 }),
+            'EX',
+            OTP_TTL_SEC,
+          );
+        }
+      } catch (_) {}
+      console.log(`[TEST] OTP skipped for test mobile. Use fixed OTP: ${testOtp}`);
+      return { message: 'OTP sent successfully' };
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     try {
       if (r) {
         const sendCount = await r.incr(otpSendRlKey(mobile));
@@ -186,6 +217,17 @@ export class AuthService {
     const mobile = this.normalizeMobile(input.mobile_number);
     const r = this.getRedis();
 
+    // ─── Play Store / Test bypass ────────────────────────────────────────────
+    const testMobile = (process.env.TEST_MOBILE ?? '').trim();
+    const testOtp = (process.env.TEST_OTP ?? '').trim();
+    if (testMobile && testOtp && mobile === testMobile) {
+      if (input.otp !== testOtp) {
+        throw new UnauthorizedException('Invalid OTP');
+      }
+      // Proceed directly to session creation — skip Redis OTP lookup
+    } else {
+    // ─────────────────────────────────────────────────────────────────────────
+
     let raw: string | null = null;
 
     try {
@@ -221,6 +263,7 @@ export class AuthService {
 
       throw new UnauthorizedException('Invalid OTP');
     }
+    } // end of non-test OTP block
 
     const user = await this.userModel.findOne({ mobile_number: mobile }); // ✅ FIX
     if (!user) throw new UnauthorizedException('User not found');
