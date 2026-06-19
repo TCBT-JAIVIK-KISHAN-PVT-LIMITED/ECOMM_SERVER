@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Order } from './schemas/order.schema';
 import { Model } from 'mongoose';
@@ -30,7 +34,13 @@ export class OrdersService {
   ) { }
 
   async createOrder(userId: string, dto: any) {
-    const { items, address, totalWeight, discount = 0, couponName = null } = dto;
+    const {
+      items,
+      address,
+      totalWeight,
+      discount = 0,
+      couponName = null,
+    } = dto;
 
     if (!totalWeight || totalWeight <= 0) {
       throw new BadRequestException('Invalid total weight from cart');
@@ -80,8 +90,8 @@ export class OrdersService {
       paymentStatus: 'pending',
     });
 
-    const payment = await this.paymentService.createPaymentSession(order);
 
+    const payment = await this.paymentService.createPaymentSession(order);
 
     order.paymentSessionId = payment?.payments_session_id;
     await order.save();
@@ -94,7 +104,7 @@ export class OrdersService {
     };
   }
 
-  async createOrderFromCart(userId: string, addressId: any, couponId?: string,) {
+  async createOrderFromCart(userId: string, addressId: any, couponId?: string) {
     const cart = await this.cartService.getCartSummaryByUser(userId);
 
     if (!cart || cart.items.length === 0) {
@@ -111,10 +121,7 @@ export class OrdersService {
         image: item.image_url || null,
       };
     });
-    const address = await this.usersService.findAddressById(
-      userId,
-      addressId,
-    );
+    const address = await this.usersService.findAddressById(userId, addressId);
 
     if (!address) {
       throw new Error('Address not found');
@@ -212,7 +219,11 @@ export class OrdersService {
     return { message: 'Order cancelled successfully' };
   }
 
-  async handlePaymentSuccess(orderId: string, paymentId: string, amount: number) {
+  async handlePaymentSuccess(
+    orderId: string,
+    paymentId: string,
+    amount: number,
+  ) {
     const order = await this.orderModel.findOne({ orderId });
 
     if (!order) throw new Error('Order not found');
@@ -229,7 +240,7 @@ export class OrdersService {
 
     await order.save();
 
-    await this.cartService.getOrCreateForUser(order.userId).then(c => {
+    await this.cartService.getOrCreateForUser(order.userId).then((c) => {
       c.items = [];
       return c.save();
     });
@@ -247,7 +258,9 @@ export class OrdersService {
 
     if (!zohoContactId) {
       try {
-        console.log(`[Order] No zoho_contact_id for user ${order.userId}, creating...`);
+        console.log(
+          `[Order] No zoho_contact_id for user ${order.userId}, creating...`,
+        );
         zohoContactId = await this.zohoInventoryService.createOrGetContact({
           name: user?.name,
           mobile_number: user?.mobile_number,
@@ -258,7 +271,9 @@ export class OrdersService {
         await this.userModel.findByIdAndUpdate(order.userId, {
           zoho_contact_id: zohoContactId,
         });
-        console.log(`[Order] Saved zoho_contact_id ${zohoContactId} to user ${order.userId}`);
+        console.log(
+          `[Order] Saved zoho_contact_id ${zohoContactId} to user ${order.userId}`,
+        );
       } catch (err: any) {
         console.error('[Order] Failed to create Zoho contact:', err.message);
         order.zohoSyncError = `Contact creation failed: ${err.message}`;
@@ -268,10 +283,15 @@ export class OrdersService {
     }
 
     try {
-      const result = await this.zohoInventoryService.createSalesOrderWithInvoice(
-        order,
-        zohoContactId,
-      );
+      // Attach customer name so Zoho invoice shows it in the "Bill To" attention field
+      (order as any).customerName = user.name || '';
+      (order as any).customerMobile = user.mobile_number || '';
+
+      const result =
+        await this.zohoInventoryService.createSalesOrderWithInvoice(
+          order,
+          zohoContactId,
+        );
 
       order.zohoSalesOrderId = result.salesOrderId;
       order.zohoInvoiceId = result.invoiceId;
@@ -281,7 +301,9 @@ export class OrdersService {
       order.orderStatus = 'processing';
 
       await order.save();
-      console.log(`[Order] ✅ Zoho sync complete — SO: ${result.salesOrderId}, Invoice: ${result.invoiceNumber}, Payment: ${result.paymentId}`);
+      console.log(
+        `[Order] ✅ Zoho sync complete — SO: ${result.salesOrderId}, Invoice: ${result.invoiceNumber}, Payment: ${result.paymentId}`,
+      );
     } catch (error: any) {
       console.error('Zoho Sync Failed:', error);
 
@@ -308,16 +330,11 @@ export class OrdersService {
 
     const receiver_phone = (order as any)?.address?.receiver_phone;
 
-
     if (order.paymentStatus === 'paid') {
       if (receiver_phone) {
         this.smsService
-          .sendOrderSuccessSMS(
-            receiver_phone,
-            order.finalAmount,
-            order.orderId,
-          )
-          .catch(err => console.error('SMS async error:', err));
+          .sendOrderSuccessSMS(receiver_phone, order.finalAmount, order.orderId)
+          .catch((err) => console.error('SMS async error:', err));
       }
 
       return { status: 'paid', orderId: order.orderId };
@@ -335,14 +352,8 @@ export class OrdersService {
 
     const { status, paymentId, amount } = result;
 
-
     if (status === 'succeeded' && paymentId && amount) {
-      await this.handlePaymentSuccess(
-        orderId,
-        paymentId,
-        parseFloat(amount),
-      );
-
+      await this.handlePaymentSuccess(orderId, paymentId, parseFloat(amount));
 
       if (receiver_phone) {
         this.smsService
@@ -351,12 +362,11 @@ export class OrdersService {
             parseFloat(amount),
             order.orderId,
           )
-          .catch(err => console.error('SMS async error:', err));
+          .catch((err) => console.error('SMS async error:', err));
       }
 
       return { status: 'paid', orderId: order.orderId };
     }
-
 
     await this.handlePaymentFailure(orderId);
 
@@ -373,4 +383,4 @@ export class OrdersService {
     order.paymentStatus = 'failed';
     await order.save();
   }
-} 
+}

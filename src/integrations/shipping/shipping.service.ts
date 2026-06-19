@@ -79,7 +79,7 @@ export class ShippingService {
 
       return {
         success: true,
-        shippingCharge: Number(selected.total_charges) || 0,
+        shippingCharge: Math.ceil(Number(selected.total_charges) || 0),
         courier: selected.name,
         estimatedDelivery: selected.estimated_delivery,
         fullResponse: selected,

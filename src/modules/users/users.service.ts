@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User } from './schemas/user.schema';
 import { CrmService } from '../../zoho/crm/crm.service';
+import { ZohoInventoryService } from '../../zoho/inventory/inventory.service';
 import { AddAddressDto } from './dto/add-address.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class UsersService {
     @InjectModel(User.name)
     private userModel: Model<User>,
     private crmService: CrmService,
+    private inventoryService: ZohoInventoryService,
   ) {}
 
   // 🔹 Find by mobile
@@ -47,17 +49,49 @@ export class UsersService {
 
     if (!user) throw new Error('User not found');
 
-    // CRM sync
-    if (user.zoho_contact_id) {
-      try {
-        await this.crmService.updateContact(user.zoho_contact_id, {
+    const contactPayload = {
+      name: user.name,
+      mobile_number: user.mobile_number,
+      email: user.email,
+    };
+
+    if (!user.zoho_contact_id) {
+      // ── New user: create contact in Zoho Inventory + CRM ─────────────────
+      // Run both in parallel; failures are non-fatal (logged, not thrown).
+      const [inventoryId] = await Promise.allSettled([
+        // Inventory — createOrGetContact returns the contact_id
+        this.inventoryService.createOrGetContact(contactPayload).then(async (contactId) => {
+          // Save contact_id back to MongoDB so future updates use it
+          await this.userModel.findByIdAndUpdate(cleanId, { zoho_contact_id: contactId });
+          console.log(`[Users] ✅ Zoho Inventory contact created: ${contactId} for user ${cleanId}`);
+          return contactId;
+        }),
+        // CRM — upsertContact handles search + create
+        this.crmService.upsertContact({
+          name: user.name,
+          mobile_number: user.mobile_number,
+          email: user.email,
+        }).then((crmId) => {
+          console.log(`[Users] ✅ Zoho CRM contact upserted: ${crmId} for user ${cleanId}`);
+        }),
+      ]);
+
+      if (inventoryId.status === 'rejected') {
+        console.error('[Users] Zoho Inventory contact creation failed:', inventoryId.reason);
+      }
+    } else {
+      // ── Returning user: update both Zoho systems ──────────────────────────
+      await Promise.allSettled([
+        this.crmService.updateContact(user.zoho_contact_id, {
           First_Name: user.name,
           Email: user.email,
           Phone: user.mobile_number,
-        });
-      } catch (error) {
-        console.error('CRM update failed:', error);
-      }
+        }).then(() => console.log(`[Users] ✅ Zoho CRM contact updated: ${user.zoho_contact_id}`)),
+        this.inventoryService.updateContact(
+          user.zoho_contact_id,
+          { name: user.name, email: user.email, phone: user.mobile_number },
+        ).then(() => console.log(`[Users] ✅ Zoho Inventory contact updated: ${user.zoho_contact_id}`)),
+      ]);
     }
 
     return user;

@@ -9,10 +9,6 @@ export class AddAddressDto {
   @IsNotEmpty()
   line1!: string;
 
-  @IsOptional()
-  @IsString()
-  line2?: string;
-
   @IsString()
   @IsNotEmpty()
   city!: string;
@@ -24,12 +20,4 @@ export class AddAddressDto {
   @IsString()
   @IsNotEmpty()
   pincode!: string;
-
-  @IsOptional()
-  @IsString()
-  receiver_name?: string;
-
-  @IsOptional()
-  @IsString()
-  receiver_phone?: string;
 }

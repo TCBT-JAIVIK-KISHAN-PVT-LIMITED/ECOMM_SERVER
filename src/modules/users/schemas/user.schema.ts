@@ -23,15 +23,6 @@ class Address {
   @Prop({ required: true })
   line1!: string;
 
-  @Prop()
-  line2?: string;
-
-  @Prop()
-  receiver_name?: string;
-
-  @Prop()
-  receiver_phone?: string;
-
   @Prop({ required: true })
   city!: string;
 
@@ -40,9 +31,6 @@ class Address {
 
   @Prop({ required: true })
   pincode!: string;
-
-  @Prop({ default: false })
-  is_default!: boolean;
 }
 
 @Schema({
