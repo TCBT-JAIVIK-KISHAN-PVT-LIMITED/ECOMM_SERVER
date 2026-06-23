@@ -1,4 +1,4 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -7,6 +7,20 @@ import { RefreshDto } from './dto/refresh.dto';
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+
+  @Get()
+  getHello(): string {
+    return 'Hello World!';
+  }
+
+  @Get('health')
+  health() {
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   @Post('send-otp')
   sendOtp(@Body() dto: SendOtpDto) {
     return this.authService.sendOtp(dto.mobile_number);
