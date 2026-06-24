@@ -35,7 +35,7 @@ export class ProductsService {
   constructor(
     @InjectModel(Product.name)
     private readonly productModel: Model<Product>,
-  ) { }
+  ) {}
 
   // ─────────────────────────────────────────
   // Get all active products (lightweight list)
@@ -45,7 +45,7 @@ export class ProductsService {
       .find({ is_active: true })
       .select(
         'name price label_rate stock description image category_name ' +
-        'has_variants variant_attribute_names variants brand sku',
+          'has_variants variant_attribute_names variants brand sku',
       )
       .lean();
 
@@ -85,7 +85,10 @@ export class ProductsService {
         .findOne({
           is_active: true,
           description: { $ne: '', $exists: true },
-          name: { $regex: `^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, $options: 'i' },
+          name: {
+            $regex: `^${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+            $options: 'i',
+          },
         })
         .select('description')
         .lean();
@@ -115,9 +118,9 @@ export class ProductsService {
     const safePage = Math.max(1, Number(page));
     const safeLimit = Math.min(Math.max(1, Number(limit)), 50);
 
-const filter: ProductMongoFilter = {
-  is_active: true,
-};
+    const filter: ProductMongoFilter = {
+      is_active: true,
+    };
 
     if (category) {
       filter.$or = [
@@ -157,7 +160,7 @@ const filter: ProductMongoFilter = {
         .limit(safeLimit)
         .select(
           'name price label_rate stock image category_name has_variants ' +
-          'variant_attribute_names variants brand sku description weight weight_unit',
+            'variant_attribute_names variants brand sku description weight weight_unit',
         )
         .lean(),
       this.productModel.countDocuments(filter),

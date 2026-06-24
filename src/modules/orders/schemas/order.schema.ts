@@ -57,12 +57,16 @@ export class Order {
 
   @Prop({ type: Object, required: true })
   address!: {
-    name: string;
-    phone: string;
+    name?: string;
+    receiver_name?: string;
+    phone?: string;
+    receiver_phone?: string;
     pincode: string;
     city: string;
     state: string;
-    addressLine: string;
+    addressLine?: string;
+    line1?: string;
+    line2?: string;
   };
 
   // 💳 Payment Fields

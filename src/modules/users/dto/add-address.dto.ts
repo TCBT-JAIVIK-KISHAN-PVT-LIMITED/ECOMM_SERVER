@@ -9,6 +9,18 @@ export class AddAddressDto {
   @IsNotEmpty()
   line1!: string;
 
+  @IsOptional()
+  @IsString()
+  line2?: string;
+
+  @IsOptional()
+  @IsString()
+  receiver_name?: string;
+
+  @IsOptional()
+  @IsString()
+  receiver_phone?: string;
+
   @IsString()
   @IsNotEmpty()
   city!: string;

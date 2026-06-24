@@ -122,7 +122,9 @@ export class AuthService {
           );
         }
       } catch (_) {}
-      console.log(`[TEST] OTP skipped for test mobile. Use fixed OTP: ${testOtp}`);
+      console.log(
+        `[TEST] OTP skipped for test mobile. Use fixed OTP: ${testOtp}`,
+      );
       return { message: 'OTP sent successfully' };
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -226,43 +228,43 @@ export class AuthService {
       }
       // Proceed directly to session creation — skip Redis OTP lookup
     } else {
-    // ─────────────────────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────────────────────
 
-    let raw: string | null = null;
-
-    try {
-      if (r) {
-        raw = await r.get(otpKey(mobile));
-      }
-    } catch (err: any) {
-      console.warn('Redis error (OTP fetch skipped):', err?.message);
-    }
-
-    if (!raw) throw new BadRequestException('OTP expired');
-
-    const payload = JSON.parse(raw);
-
-    const ok = await bcrypt.compare(input.otp, payload.hash);
-    if (!ok) {
-      const attempts = (payload.attempts ?? 0) + 1;
+      let raw: string | null = null;
 
       try {
         if (r) {
-          if (attempts >= OTP_MAX_ATTEMPTS) {
-            await r.del(otpKey(mobile));
-          } else {
-            await this.setOtpPayloadKeepingTtl(mobile, {
-              hash: payload.hash,
-              attempts,
-            });
-          }
+          raw = await r.get(otpKey(mobile));
         }
       } catch (err: any) {
-        console.warn('Redis error (OTP update skipped):', err?.message);
+        console.warn('Redis error (OTP fetch skipped):', err?.message);
       }
 
-      throw new UnauthorizedException('Invalid OTP');
-    }
+      if (!raw) throw new BadRequestException('OTP expired');
+
+      const payload = JSON.parse(raw);
+
+      const ok = await bcrypt.compare(input.otp, payload.hash);
+      if (!ok) {
+        const attempts = (payload.attempts ?? 0) + 1;
+
+        try {
+          if (r) {
+            if (attempts >= OTP_MAX_ATTEMPTS) {
+              await r.del(otpKey(mobile));
+            } else {
+              await this.setOtpPayloadKeepingTtl(mobile, {
+                hash: payload.hash,
+                attempts,
+              });
+            }
+          }
+        } catch (err: any) {
+          console.warn('Redis error (OTP update skipped):', err?.message);
+        }
+
+        throw new UnauthorizedException('Invalid OTP');
+      }
     } // end of non-test OTP block
 
     const user = await this.userModel.findOne({ mobile_number: mobile }); // ✅ FIX

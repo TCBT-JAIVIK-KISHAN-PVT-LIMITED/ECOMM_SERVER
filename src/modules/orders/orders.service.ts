@@ -31,7 +31,7 @@ export class OrdersService {
     private readonly smsService: SmsService,
     @InjectModel(Coupon.name)
     private couponModel: Model<Coupon>,
-  ) { }
+  ) {}
 
   async createOrder(userId: string, dto: any) {
     const {
@@ -89,7 +89,6 @@ export class OrdersService {
       orderStatus: 'created',
       paymentStatus: 'pending',
     });
-
 
     const payment = await this.paymentService.createPaymentSession(order);
 

@@ -9,7 +9,7 @@ export class CartService {
   constructor(
     @InjectModel(Cart.name) private cartModel: Model<Cart>,
     @InjectModel(Product.name) private productModel: Model<Product>,
-  ) { }
+  ) {}
 
   async getOrCreateForGuest(guestSessionId: string) {
     if (!guestSessionId) {
@@ -47,17 +47,12 @@ export class CartService {
     return this.upsertItem(cart, productId, quantity);
   }
 
-  async upsertItemForUser(
-    userId: string,
-    productId: string,
-    quantity: number,
-  ) {
+  async upsertItemForUser(userId: string, productId: string, quantity: number) {
     const cart = await this.getOrCreateForUser(userId);
     return this.upsertItem(cart, productId, quantity);
   }
 
   private async upsertItem(cart: Cart, productId: string, quantity: number) {
-
     if (!Number.isInteger(quantity) || quantity < 0) {
       throw new BadRequestException('Invalid quantity');
     }
@@ -130,8 +125,9 @@ export class CartService {
   private async resolveProduct(
     productId: string,
   ): Promise<{ product: any; variantId: string | null }> {
-    const isMongoId = Types.ObjectId.isValid(productId)
-      && String(new Types.ObjectId(productId)) === productId;
+    const isMongoId =
+      Types.ObjectId.isValid(productId) &&
+      String(new Types.ObjectId(productId)) === productId;
 
     if (isMongoId) {
       const product = await this.productModel.findById(productId).lean();
@@ -180,8 +176,8 @@ export class CartService {
 
     for (const item of items) {
       const id = item.product_id.toString();
-      const isMongoId = Types.ObjectId.isValid(id)
-        && String(new Types.ObjectId(id)) === id;
+      const isMongoId =
+        Types.ObjectId.isValid(id) && String(new Types.ObjectId(id)) === id;
       if (isMongoId) {
         mongoIds.push(new Types.ObjectId(id));
       } else {
@@ -209,10 +205,7 @@ export class CartService {
       .lean();
 
     // Build a lookup map: cart key → { product, variant? }
-    const lookupMap = new Map<
-      string,
-      { product: any; variant: any | null }
-    >();
+    const lookupMap = new Map<string, { product: any; variant: any | null }>();
 
     for (const p of products) {
       // Map by _id
@@ -237,9 +230,7 @@ export class CartService {
 
       // Use variant data if available, otherwise parent product
       const price = v?.price ?? p?.price ?? 0;
-      const name = v
-        ? this.getVariantDisplayName(p, v)
-        : p?.name;
+      const name = v ? this.getVariantDisplayName(p, v) : p?.name;
       const imageUrl = v?.image?.image_url ?? p?.image?.image_url ?? null;
 
       let weight = 0;
@@ -293,7 +284,7 @@ export class CartService {
     const attrs = variant?.attributes;
     if (attrs && typeof attrs === 'object') {
       const values = Object.values(attrs).filter(
-        (v) => typeof v === 'string' && (v as string).trim(),
+        (v) => typeof v === 'string' && v.trim(),
       );
       if (values.length) {
         return `${baseName} — ${values.join(', ')}`;
@@ -335,7 +326,6 @@ export class CartService {
     const guestCart = await this.cartModel.findOne({
       guest_session_id: guestSessionId,
     });
-
 
     if (!guestCart || !guestCart.items?.length) return;
 

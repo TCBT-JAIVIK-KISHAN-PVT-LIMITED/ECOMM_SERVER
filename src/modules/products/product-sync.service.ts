@@ -10,96 +10,100 @@ import { ZohoInventoryService } from '../../zoho/inventory/inventory.service';
 import { ZohoImageSyncService } from '../../integrations/zoho-image-sync/zoho-image-sync.service';
 
 interface ZohoItem {
-    item_id: string;
-    group_id?: string;
-    group_name?: string;
-    name: string;
-    description?: string;
-    sku?: string;
-    status: 'active' | 'inactive';
-    rate: number;
-    stock_on_hand?: number;
-    available_stock?: number;
-    actual_available_stock?: number;
-    category_id?: string;
-    category_name?: string;
-    brand?: string;
-    manufacturer?: string;
-    hsn_or_sac?: string;
-    product_type?: string;
-    item_type?: string;
-    track_inventory?: boolean;
-    is_taxable?: boolean;
+  item_id: string;
+  group_id?: string;
+  group_name?: string;
+  name: string;
+  description?: string;
+  sku?: string;
+  status: 'active' | 'inactive';
+  rate: number;
+  stock_on_hand?: number;
+  available_stock?: number;
+  actual_available_stock?: number;
+  category_id?: string;
+  category_name?: string;
+  brand?: string;
+  manufacturer?: string;
+  hsn_or_sac?: string;
+  product_type?: string;
+  item_type?: string;
+  track_inventory?: boolean;
+  is_taxable?: boolean;
 
-    weight?: number | string;
-    weight_unit?: string;
-    length?: number | string;
-    width?: number | string;
-    height?: number | string;
-    dimension_unit?: string;
-    dimensions_with_unit?: string;
-    weight_with_unit?: string;
+  weight?: number | string;
+  weight_unit?: string;
+  length?: number | string;
+  width?: number | string;
+  height?: number | string;
+  dimension_unit?: string;
+  dimensions_with_unit?: string;
+  weight_with_unit?: string;
 
-    image_name?: string;
-    image_type?: string;
-    image_document_id?: string;
+  image_name?: string;
+  image_type?: string;
+  image_document_id?: string;
 
-    attribute_name1?: string;
-    attribute_name2?: string;
-    attribute_name3?: string;
-    attribute_option_name1?: string;
-    attribute_option_name2?: string;
-    attribute_option_name3?: string;
+  attribute_name1?: string;
+  attribute_name2?: string;
+  attribute_name3?: string;
+  attribute_option_name1?: string;
+  attribute_option_name2?: string;
+  attribute_option_name3?: string;
 }
 
 function toNum(value: any): number {
-    const n = Number(value);
-    return isNaN(n) ? 0 : n;
+  const n = Number(value);
+  return isNaN(n) ? 0 : n;
 }
-
 
 function extractAttributes(item: ZohoItem): Record<string, string> {
-    const attrs: Record<string, string> = {};
-    const axes = [
-        ['attribute_name1', 'attribute_option_name1'],
-        ['attribute_name2', 'attribute_option_name2'],
-        ['attribute_name3', 'attribute_option_name3'],
-    ] as const;
+  const attrs: Record<string, string> = {};
+  const axes = [
+    ['attribute_name1', 'attribute_option_name1'],
+    ['attribute_name2', 'attribute_option_name2'],
+    ['attribute_name3', 'attribute_option_name3'],
+  ] as const;
 
-    for (const [nameKey, valueKey] of axes) {
-        const name = item[nameKey];
-        const value = item[valueKey];
-        if (name && value) {
-            attrs[name] = value;
-        }
+  for (const [nameKey, valueKey] of axes) {
+    const name = item[nameKey];
+    const value = item[valueKey];
+    if (name && value) {
+      attrs[name] = value;
     }
-    return attrs;
+  }
+  return attrs;
 }
 
-
 function extractAttributeNames(items: ZohoItem[]): string[] {
-    const names = new Set<string>();
-    for (const item of items) {
-        if (item.attribute_name1) names.add(item.attribute_name1);
-        if (item.attribute_name2) names.add(item.attribute_name2);
-        if (item.attribute_name3) names.add(item.attribute_name3);
-    }
-    return [...names];
+  const names = new Set<string>();
+  for (const item of items) {
+    if (item.attribute_name1) names.add(item.attribute_name1);
+    if (item.attribute_name2) names.add(item.attribute_name2);
+    if (item.attribute_name3) names.add(item.attribute_name3);
+  }
+  return [...names];
 }
 
 // ─── SKU Whitelist — loaded from config/sku-whitelist.json ──────────────────
 function loadAllowedSkus(): Set<string> {
-    try {
-        const configPath = path.resolve(process.cwd(), 'config', 'sku-whitelist.json');
-        const raw = fs.readFileSync(configPath, 'utf-8');
-        const config = JSON.parse(raw);
-        const skus = new Set<string>(config.skus || []);
-        console.log(`[SKU Whitelist] Loaded ${skus.size} SKUs from ${configPath}`);
-        return skus;
-    } catch (err: any) {
-        console.error(`[SKU Whitelist] Failed to load config: ${err.message}. No products will be whitelisted.`);
-        return new Set<string>();
-    }
+  try {
+    const configPath = path.resolve(
+      process.cwd(),
+      'config',
+      'sku-whitelist.json',
+    );
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(raw);
+    const skus = new Set<string>(config.skus || []);
+    console.log(`[SKU Whitelist] Loaded ${skus.size} SKUs from ${configPath}`);
+    return skus;
+  } catch (err: any) {
+    console.error(
+      `[SKU Whitelist] Failed to load config: ${err.message}. No products will be whitelisted.`,
+    );
+    return new Set<string>();
+  }
 }
 
 const ALLOWED_SKUS = loadAllowedSkus();
@@ -109,12 +113,12 @@ const ALLOWED_SKUS = loadAllowedSkus();
  * Handles variant SKUs like "1001-A" by checking the base prefix.
  */
 function isSkuAllowed(sku: string | undefined): boolean {
-    if (!sku) return false;
-    const trimmed = sku.trim();
-    if (ALLOWED_SKUS.has(trimmed)) return true;
-    const base = trimmed.split('-')[0].trim();
-    if (ALLOWED_SKUS.has(base)) return true;
-    return false;
+  if (!sku) return false;
+  const trimmed = sku.trim();
+  if (ALLOWED_SKUS.has(trimmed)) return true;
+  const base = trimmed.split('-')[0].trim();
+  if (ALLOWED_SKUS.has(base)) return true;
+  return false;
 }
 
 /**
@@ -122,513 +126,514 @@ function isSkuAllowed(sku: string | undefined): boolean {
  * Returns true if ANY item in the group has an allowed SKU.
  */
 function isGroupAllowed(items: ZohoItem[]): boolean {
-    return items.some((item) => isSkuAllowed(item.sku));
+  return items.some((item) => isSkuAllowed(item.sku));
 }
 
 function shouldSyncItem(item: ZohoItem): boolean {
+  if (item.status !== 'active') {
+    return false;
+  }
 
-    if (item.status !== 'active') {
-        return false;
-    }
+  if (item.item_type !== 'inventory') {
+    return false;
+  }
 
-    if (item.item_type !== 'inventory') {
-        return false;
-    }
+  if (!item.sku || item.sku.trim().length < 2) {
+    return false;
+  }
 
-    if (!item.sku || item.sku.trim().length < 2) {
-        return false;
-    }
-
-    // Whitelisted SKUs bypass category/stock/price/image checks
-    if (isSkuAllowed(item.sku)) {
-        return true;
-    }
-
-    if (!item.category_id || !item.category_name) {
-        return false;
-    }
-
-    const stock = toNum(
-        item.actual_available_stock ??
-        item.available_stock ??
-        item.stock_on_hand,
-    );
-
-    if (stock < 1) {
-        return false;
-    }
-
-    if (toNum(item.rate) <= 0) {
-        return false;
-    }
-
-    if (!item.image_document_id) {
-        return false;
-    }
-
+  // Whitelisted SKUs bypass category/stock/price/image checks
+  if (isSkuAllowed(item.sku)) {
     return true;
+  }
+
+  if (!item.category_id || !item.category_name) {
+    return false;
+  }
+
+  const stock = toNum(
+    item.actual_available_stock ?? item.available_stock ?? item.stock_on_hand,
+  );
+
+  if (stock < 1) {
+    return false;
+  }
+
+  if (toNum(item.rate) <= 0) {
+    return false;
+  }
+
+  if (!item.image_document_id) {
+    return false;
+  }
+
+  return true;
 }
 
 function buildVariant(item: ZohoItem) {
-    return {
-        zoho_item_id: String(item.item_id),
+  return {
+    zoho_item_id: String(item.item_id),
 
-        sku: item.sku ?? '',
+    sku: item.sku ?? '',
 
-        name: item.name,
+    name: item.name,
 
-        price: toNum(item.rate),
+    price: toNum(item.rate),
 
-        stock: toNum(
-            item.actual_available_stock ??
-            item.available_stock ??
-            item.stock_on_hand,
-        ),
+    stock: toNum(
+      item.actual_available_stock ?? item.available_stock ?? item.stock_on_hand,
+    ),
 
-        attributes: extractAttributes(item),
+    attributes: extractAttributes(item),
 
-        weight: toNum(item.weight),
+    weight: toNum(item.weight),
 
-        weight_unit: item.weight_unit ?? 'kg',
+    weight_unit: item.weight_unit ?? 'kg',
 
-        dimensions_with_unit:
-            item.dimensions_with_unit ?? '',
+    dimensions_with_unit: item.dimensions_with_unit ?? '',
 
-        weight_with_unit:
-            item.weight_with_unit ?? '',
+    weight_with_unit: item.weight_with_unit ?? '',
 
-        image: null,
+    image: null,
 
-        is_active: item.status === 'active',
-    };
+    is_active: item.status === 'active',
+  };
 }
 
 function buildProductFromGroup(
-    groupId: string,
-    groupName: string,
-    items: ZohoItem[],
-    isVariant: boolean,
+  groupId: string,
+  groupName: string,
+  items: ZohoItem[],
+  isVariant: boolean,
 ): any {
-    const activeItems = items.filter(
-        (i) => i.status === 'active',
-    );
+  const activeItems = items.filter((i) => i.status === 'active');
 
-    const primary = activeItems[0] ?? items[0];
+  const primary = activeItems[0] ?? items[0];
 
-    const variants = items.map(buildVariant);
+  const variants = items.map(buildVariant);
 
-    const totalStock = variants
-        .filter((v) => v.is_active)
-        .reduce((s, v) => s + v.stock, 0);
+  const totalStock = variants
+    .filter((v) => v.is_active)
+    .reduce((s, v) => s + v.stock, 0);
 
-    return {
-        zoho_item_id: groupId,
+  return {
+    zoho_item_id: groupId,
 
-        zoho_group_id: isVariant
-            ? groupId
-            : '',
+    zoho_group_id: isVariant ? groupId : '',
 
-        name: isVariant
-            ? groupName
-            : primary.name,
+    name: isVariant ? groupName : primary.name,
 
-        description: items.find((i) => i.description?.trim())?.description ?? primary.description ?? '',
+    description:
+      items.find((i) => i.description?.trim())?.description ??
+      primary.description ??
+      '',
 
-        sku: primary.sku ?? '',
+    sku: primary.sku ?? '',
 
-        category_id: primary.category_id ?? '',
+    category_id: primary.category_id ?? '',
 
-        category_name:
-            primary.category_name ?? '',
+    category_name: primary.category_name ?? '',
 
-        brand: primary.brand ?? '',
+    brand: primary.brand ?? '',
 
-        manufacturer:
-            primary.manufacturer ?? '',
+    manufacturer: primary.manufacturer ?? '',
 
-        price: toNum(primary.rate),
+    price: toNum(primary.rate),
 
-        stock: totalStock,
+    stock: totalStock,
 
-        weight: toNum(primary.weight),
+    weight: toNum(primary.weight),
 
-        weight_unit:
-            primary.weight_unit ?? 'kg',
+    weight_unit: primary.weight_unit ?? 'kg',
 
-        dimensions_with_unit:
-            primary.dimensions_with_unit ?? '',
+    dimensions_with_unit: primary.dimensions_with_unit ?? '',
 
-        zoho_image_document_id:
-            primary.image_document_id ?? '',
+    zoho_image_document_id: primary.image_document_id ?? '',
 
-        has_variants: isVariant,
+    has_variants: isVariant,
 
-        variant_attribute_names: isVariant
-            ? extractAttributeNames(items)
-            : [],
+    variant_attribute_names: isVariant ? extractAttributeNames(items) : [],
 
-        variants: isVariant
-            ? variants
-            : [buildVariant(primary)],
+    variants: isVariant ? variants : [buildVariant(primary)],
 
-        is_active: activeItems.length > 0,
-    };
+    is_active: activeItems.length > 0,
+  };
 }
 
 @Injectable()
 export class ProductSyncService {
-    private readonly logger = new Logger(ProductSyncService.name);
+  private readonly logger = new Logger(ProductSyncService.name);
 
-    private syncInProgress = false;
+  private syncInProgress = false;
 
-    constructor(
-        @InjectModel(Product.name)
-        private readonly productModel: Model<Product>,
-        private readonly zohoInventoryService: ZohoInventoryService,
-        private readonly zohoImageSyncService: ZohoImageSyncService,
-    ) { }
+  constructor(
+    @InjectModel(Product.name)
+    private readonly productModel: Model<Product>,
+    private readonly zohoInventoryService: ZohoInventoryService,
+    private readonly zohoImageSyncService: ZohoImageSyncService,
+  ) {}
 
-    @Cron('0 */6 * * *')
-    async syncAllProducts(): Promise<void> {
-        if (this.syncInProgress) {
-            this.logger.warn('⏭️  Sync already running — skipping this trigger');
-            return;
+  @Cron('0 */6 * * *')
+  async syncAllProducts(): Promise<void> {
+    if (this.syncInProgress) {
+      this.logger.warn('⏭️  Sync already running — skipping this trigger');
+      return;
+    }
+    this.syncInProgress = true;
+
+    this.logger.log('🔄 Starting full product sync from Zoho Inventory...');
+    const start = Date.now();
+
+    try {
+      const allItems: ZohoItem[] =
+        await this.zohoInventoryService.getAllItems();
+      this.logger.log(`📦 Fetched ${allItems.length} items from Zoho`);
+
+      // DEBUG: Log sample SKUs to understand the format
+      const sampleSkus = allItems
+        .slice(0, 20)
+        .map((i) => i.sku)
+        .filter(Boolean);
+      this.logger.log(
+        `🔍 Sample SKUs from Zoho: ${JSON.stringify(sampleSkus)}`,
+      );
+      const allSkus = allItems.map((i) => i.sku).filter(Boolean);
+      const matchingSkus = allSkus.filter((s) => isSkuAllowed(s));
+      this.logger.log(
+        `🔍 Total SKUs: ${allSkus.length}, Matching whitelist: ${matchingSkus.length}`,
+      );
+
+      // DEBUG: Log WHY whitelisted items are rejected
+      for (const item of allItems) {
+        if (!isSkuAllowed(item.sku)) continue;
+        if (shouldSyncItem(item)) continue;
+        const stock = toNum(
+          item.actual_available_stock ??
+            item.available_stock ??
+            item.stock_on_hand,
+        );
+        const reasons: string[] = [];
+        if (item.status !== 'active') reasons.push('inactive');
+        if (item.item_type !== 'inventory')
+          reasons.push(`type=${item.item_type}`);
+        if (!item.category_id) reasons.push('no_category');
+        if (stock < 1) reasons.push(`stock=${stock}`);
+        if (toNum(item.rate) <= 0) reasons.push(`price=${item.rate}`);
+        if (!item.image_document_id) reasons.push('no_image');
+        this.logger.warn(
+          `⚠️ SKU ${item.sku} (${item.name}) REJECTED: ${reasons.join(', ')}`,
+        );
+      }
+
+      const validItems = allItems.filter(shouldSyncItem);
+
+      this.logger.log(`✅ ${validItems.length} sellable items after filtering`);
+
+      const grouped = this.groupItems(validItems);
+      this.logger.log(
+        `🗂️  Resolved to ${grouped.size} products (grouped + standalone)`,
+      );
+
+      // Filter groups by SKU whitelist
+      const allowedGroups = [...grouped.entries()].filter(([, { items }]) =>
+        isGroupAllowed(items),
+      );
+      this.logger.log(
+        `🔑 ${allowedGroups.length} products match SKU whitelist`,
+      );
+
+      let synced = 0;
+      let failed = 0;
+      const seenProductIds = new Set<string>();
+
+      for (const [
+        productId,
+        { groupId, groupName, items, isVariant },
+      ] of allowedGroups) {
+        try {
+          await this.syncOneProduct(
+            productId,
+            groupId,
+            groupName,
+            items,
+            isVariant,
+          );
+          seenProductIds.add(productId);
+          synced++;
+
+          await new Promise((r) => setTimeout(r, 1000));
+        } catch (err: any) {
+          this.logger.error(
+            `❌ Failed to sync product ${productId}: ${err.message}`,
+          );
+          failed++;
         }
-        this.syncInProgress = true;
+      }
 
-        this.logger.log('🔄 Starting full product sync from Zoho Inventory...');
-        const start = Date.now();
+      if (failed === 0) {
+        const deactivated = await this.productModel.updateMany(
+          {
+            zoho_item_id: {
+              $nin: [...seenProductIds],
+            },
+            is_active: true,
+          },
+          {
+            $set: { is_active: false },
+          },
+        );
+
+        if (deactivated.modifiedCount > 0) {
+          this.logger.log(
+            `🗂️  Deactivated ${deactivated.modifiedCount} products no longer in Zoho`,
+          );
+        }
+      } else {
+        this.logger.warn('⚠️ Skipping deactivation due to sync failures');
+      }
+
+      const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+      this.logger.log(
+        `✅ Sync complete in ${elapsed}s — synced: ${synced}, failed: ${failed}`,
+      );
+    } catch (err: any) {
+      this.logger.error(`💥 Full sync failed: ${err.message}`);
+    } finally {
+      this.syncInProgress = false;
+    }
+  }
+
+  async syncSingleItem(zohoItemId: string): Promise<void> {
+    this.logger.log(`🔁 Webhook sync for item: ${zohoItemId}`);
+
+    const item = await this.zohoInventoryService.getItem(zohoItemId);
+
+    if (!item) {
+      this.logger.warn(
+        `⚠️ Item ${zohoItemId} not found in Zoho — deactivating`,
+      );
+
+      await this.productModel.updateOne(
+        {
+          $or: [
+            { zoho_item_id: zohoItemId },
+            { 'variants.zoho_item_id': zohoItemId },
+          ],
+        },
+        { $set: { is_active: false } },
+      );
+
+      return;
+    }
+
+    if (item.group_id) {
+      const allItems = await this.zohoInventoryService.getAllItems();
+
+      const siblings = allItems.filter(
+        (i: ZohoItem) => i.group_id === item.group_id,
+      );
+
+      // SKU whitelist check — reject groups where no variant has an allowed SKU
+      if (!isGroupAllowed(siblings)) {
+        this.logger.warn(
+          `⚠️ Webhook item ${zohoItemId} (SKU ${item.sku}) — group not in whitelist, skipping`,
+        );
+        return;
+      }
+
+      await this.syncOneProduct(
+        item.group_id,
+        item.group_id,
+        item.group_name ?? item.name,
+        siblings,
+        true,
+      );
+    } else {
+      // SKU whitelist check — reject standalone items not in the whitelist
+      if (!isSkuAllowed(item.sku)) {
+        this.logger.warn(
+          `⚠️ Webhook item ${zohoItemId} (SKU ${item.sku}) not in whitelist, skipping`,
+        );
+        return;
+      }
+
+      await this.syncOneProduct(zohoItemId, '', item.name, [item], false);
+    }
+  }
+
+  async deleteByZohoItemId(zohoItemId: string): Promise<void> {
+    this.logger.log(`🗑️  Deleting item: ${zohoItemId}`);
+
+    const product = await this.productModel.findOne({
+      $or: [
+        { zoho_item_id: zohoItemId },
+        { 'variants.zoho_item_id': zohoItemId },
+      ],
+    });
+
+    if (!product) {
+      this.logger.warn(`⚠️  Item ${zohoItemId} not found in DB`);
+      return;
+    }
+
+    const keysToDelete = this.collectS3Keys(product);
+    await Promise.allSettled(
+      keysToDelete.map((key) => this.zohoImageSyncService.deleteFromS3(key)),
+    );
+
+    await this.productModel.deleteOne({ _id: product._id });
+    this.logger.log(
+      `✅ Deleted product ${product.zoho_item_id} from DB and S3`,
+    );
+  }
+
+  private groupItems(items: ZohoItem[]): Map<
+    string,
+    {
+      groupId: string;
+      groupName: string;
+      items: ZohoItem[];
+      isVariant: boolean;
+    }
+  > {
+    const map = new Map<
+      string,
+      {
+        groupId: string;
+        groupName: string;
+        items: ZohoItem[];
+        isVariant: boolean;
+      }
+    >();
+
+    for (const item of items) {
+      if (item.group_id) {
+        const existing = map.get(item.group_id);
+
+        if (existing) {
+          existing.items.push(item);
+        } else {
+          map.set(item.group_id, {
+            groupId: item.group_id,
+            groupName: item.group_name ?? item.name,
+            items: [item],
+            isVariant: true,
+          });
+        }
+      } else {
+        map.set(item.item_id, {
+          groupId: item.item_id,
+          groupName: item.name,
+          items: [item],
+          isVariant: false,
+        });
+      }
+    }
+
+    return map;
+  }
+
+  private async syncOneProduct(
+    productId: string,
+    groupId: string,
+    groupName: string,
+    items: ZohoItem[],
+    isVariant: boolean,
+  ): Promise<void> {
+    const productData = buildProductFromGroup(
+      productId,
+      groupName,
+      items,
+      isVariant,
+    );
+
+    const existing = await this.productModel
+      .findOne({ zoho_item_id: productId })
+      .lean();
+
+    if (isVariant) {
+      for (const item of items) {
+        const variantIdx = productData.variants.findIndex(
+          (v: any) => v.zoho_item_id === String(item.item_id),
+        );
+        if (variantIdx === -1) continue;
+
+        const existingVariant = (existing as any)?.variants?.find(
+          (v: any) => v.zoho_item_id === String(item.item_id),
+        );
 
         try {
-
-            const allItems: ZohoItem[] = await this.zohoInventoryService.getAllItems();
-            this.logger.log(`📦 Fetched ${allItems.length} items from Zoho`);
-
-            // DEBUG: Log sample SKUs to understand the format
-            const sampleSkus = allItems.slice(0, 20).map((i) => i.sku).filter(Boolean);
-            this.logger.log(`🔍 Sample SKUs from Zoho: ${JSON.stringify(sampleSkus)}`);
-            const allSkus = allItems.map((i) => i.sku).filter(Boolean);
-            const matchingSkus = allSkus.filter((s) => isSkuAllowed(s));
-            this.logger.log(`🔍 Total SKUs: ${allSkus.length}, Matching whitelist: ${matchingSkus.length}`);
-
-            // DEBUG: Log WHY whitelisted items are rejected
-            for (const item of allItems) {
-                if (!isSkuAllowed(item.sku)) continue;
-                if (shouldSyncItem(item)) continue;
-                const stock = toNum(item.actual_available_stock ?? item.available_stock ?? item.stock_on_hand);
-                const reasons: string[] = [];
-                if (item.status !== 'active') reasons.push('inactive');
-                if (item.item_type !== 'inventory') reasons.push(`type=${item.item_type}`);
-                if (!item.category_id) reasons.push('no_category');
-                if (stock < 1) reasons.push(`stock=${stock}`);
-                if (toNum(item.rate) <= 0) reasons.push(`price=${item.rate}`);
-                if (!item.image_document_id) reasons.push('no_image');
-                this.logger.warn(`⚠️ SKU ${item.sku} (${item.name}) REJECTED: ${reasons.join(', ')}`);
-            }
-
-            const validItems = allItems.filter(
-                shouldSyncItem,
-            );
-
-            this.logger.log(
-                `✅ ${validItems.length} sellable items after filtering`,
-            );
-
-            const grouped = this.groupItems(validItems);
-            this.logger.log(`🗂️  Resolved to ${grouped.size} products (grouped + standalone)`);
-
-            // Filter groups by SKU whitelist
-            const allowedGroups = [...grouped.entries()].filter(
-                ([, { items }]) => isGroupAllowed(items),
-            );
-            this.logger.log(`🔑 ${allowedGroups.length} products match SKU whitelist`);
-
-            let synced = 0;
-            let failed = 0;
-            const seenProductIds = new Set<string>();
-
-            for (const [productId, { groupId, groupName, items, isVariant }] of allowedGroups) {
-                try {
-                    await this.syncOneProduct(productId, groupId, groupName, items, isVariant);
-                    seenProductIds.add(productId);
-                    synced++;
-
-                    await new Promise((r) => setTimeout(r, 1000));
-                } catch (err: any) {
-                    this.logger.error(`❌ Failed to sync product ${productId}: ${err.message}`);
-                    failed++;
-                }
-            }
-
-
-            if (failed === 0) {
-
-                const deactivated =
-                    await this.productModel.updateMany(
-                        {
-                            zoho_item_id: {
-                                $nin: [...seenProductIds],
-                            },
-                            is_active: true,
-                        },
-                        {
-                            $set: { is_active: false },
-                        },
-                    );
-
-                if (deactivated.modifiedCount > 0) {
-                    this.logger.log(
-                        `🗂️  Deactivated ${deactivated.modifiedCount} products no longer in Zoho`,
-                    );
-                }
-
-            } else {
-
-                this.logger.warn(
-                    '⚠️ Skipping deactivation due to sync failures',
-                );
-
-            }
-
-            const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-            this.logger.log(
-                `✅ Sync complete in ${elapsed}s — synced: ${synced}, failed: ${failed}`,
-            );
-        } catch (err: any) {
-            this.logger.error(`💥 Full sync failed: ${err.message}`);
-        } finally {
-            this.syncInProgress = false;
+          const imageMeta = await this.zohoImageSyncService.syncImageForItem(
+            String(item.item_id),
+            item.image_name,
+            existingVariant?.image ?? null,
+          );
+          productData.variants[variantIdx].image = imageMeta;
+        } catch (imgErr: any) {
+          this.logger.warn(
+            `⚠️ Image sync failed for variant ${item.item_id} (${item.sku}), saving without image: ${imgErr?.message}`,
+          );
+          productData.variants[variantIdx].image =
+            existingVariant?.image ?? null;
         }
-    }
+      }
 
-    async syncSingleItem(zohoItemId: string): Promise<void> {
-        this.logger.log(`🔁 Webhook sync for item: ${zohoItemId}`);
-
-        const item = await this.zohoInventoryService.getItem(zohoItemId);
-
-        if (!item) {
-            this.logger.warn(`⚠️ Item ${zohoItemId} not found in Zoho — deactivating`);
-
-            await this.productModel.updateOne(
-                {
-                    $or: [
-                        { zoho_item_id: zohoItemId },
-                        { 'variants.zoho_item_id': zohoItemId },
-                    ],
-                },
-                { $set: { is_active: false } },
-            );
-
-            return;
-        }
-
-
-        if (item.group_id) {
-            const allItems = await this.zohoInventoryService.getAllItems();
-
-            const siblings = allItems.filter(
-                (i: ZohoItem) => i.group_id === item.group_id,
-            );
-
-            // SKU whitelist check — reject groups where no variant has an allowed SKU
-            if (!isGroupAllowed(siblings)) {
-                this.logger.warn(`⚠️ Webhook item ${zohoItemId} (SKU ${item.sku}) — group not in whitelist, skipping`);
-                return;
-            }
-
-            await this.syncOneProduct(
-                item.group_id,
-                item.group_id,
-                item.group_name ?? item.name,
-                siblings,
-                true,
-            );
-        }
-
-
-        else {
-            // SKU whitelist check — reject standalone items not in the whitelist
-            if (!isSkuAllowed(item.sku)) {
-                this.logger.warn(`⚠️ Webhook item ${zohoItemId} (SKU ${item.sku}) not in whitelist, skipping`);
-                return;
-            }
-
-            await this.syncOneProduct(
-                zohoItemId,
-                '',
-                item.name,
-                [item],
-                false,
-            );
-        }
-    }
-
-    async deleteByZohoItemId(zohoItemId: string): Promise<void> {
-        this.logger.log(`🗑️  Deleting item: ${zohoItemId}`);
-
-        const product = await this.productModel.findOne({
-            $or: [
-                { zoho_item_id: zohoItemId },
-                { 'variants.zoho_item_id': zohoItemId },
-            ],
-        });
-
-        if (!product) {
-            this.logger.warn(`⚠️  Item ${zohoItemId} not found in DB`);
-            return;
-        }
-
-
-        const keysToDelete = this.collectS3Keys(product);
-        await Promise.allSettled(
-            keysToDelete.map((key) =>
-                this.zohoImageSyncService.deleteFromS3(key),
-            ),
+      const firstActiveVariant = productData.variants.find(
+        (v: any) => v.is_active && v.image,
+      );
+      productData.image = firstActiveVariant?.image ?? null;
+    } else {
+      const singleItem = items[0];
+      try {
+        const imageMeta = await this.zohoImageSyncService.syncImageForItem(
+          String(singleItem.item_id),
+          singleItem.image_name,
+          (existing as any)?.image ?? null,
         );
-
-        await this.productModel.deleteOne({ _id: product._id });
-        this.logger.log(`✅ Deleted product ${product.zoho_item_id} from DB and S3`);
-    }
-
-    private groupItems(items: ZohoItem[]): Map<
-        string,
-        { groupId: string; groupName: string; items: ZohoItem[]; isVariant: boolean }
-    > {
-        const map = new Map<
-            string,
-            { groupId: string; groupName: string; items: ZohoItem[]; isVariant: boolean }
-        >();
-
-        for (const item of items) {
-
-            if (item.group_id) {
-
-                const existing = map.get(item.group_id);
-
-                if (existing) {
-                    existing.items.push(item);
-                } else {
-                    map.set(item.group_id, {
-                        groupId: item.group_id,
-                        groupName: item.group_name ?? item.name,
-                        items: [item],
-                        isVariant: true,
-                    });
-                }
-
-            } else {
-
-                map.set(item.item_id, {
-                    groupId: item.item_id,
-                    groupName: item.name,
-                    items: [item],
-                    isVariant: false,
-                });
-
-            }
+        productData.image = imageMeta;
+        if (productData.variants[0]) {
+          productData.variants[0].image = imageMeta;
         }
-
-        return map;
-    }
-
-    private async syncOneProduct(
-        productId: string,
-        groupId: string,
-        groupName: string,
-        items: ZohoItem[],
-        isVariant: boolean,
-    ): Promise<void> {
-
-        const productData = buildProductFromGroup(productId, groupName, items, isVariant);
-
-
-        const existing = await this.productModel
-            .findOne({ zoho_item_id: productId })
-            .lean();
-
-
-        if (isVariant) {
-
-            for (const item of items) {
-                const variantIdx = productData.variants.findIndex(
-                    (v: any) => v.zoho_item_id === String(item.item_id),
-                );
-                if (variantIdx === -1) continue;
-
-                const existingVariant = (existing as any)?.variants?.find(
-                    (v: any) => v.zoho_item_id === String(item.item_id),
-                );
-
-                try {
-                    const imageMeta = await this.zohoImageSyncService.syncImageForItem(
-                        String(item.item_id),
-                        item.image_name,
-                        existingVariant?.image ?? null,
-                    );
-                    productData.variants[variantIdx].image = imageMeta;
-                } catch (imgErr: any) {
-                    this.logger.warn(`⚠️ Image sync failed for variant ${item.item_id} (${item.sku}), saving without image: ${imgErr?.message}`);
-                    productData.variants[variantIdx].image = existingVariant?.image ?? null;
-                }
-            }
-
-
-            const firstActiveVariant = productData.variants.find(
-                (v: any) => v.is_active && v.image,
-            );
-            productData.image = firstActiveVariant?.image ?? null;
-        } else {
-
-            const singleItem = items[0];
-            try {
-                const imageMeta = await this.zohoImageSyncService.syncImageForItem(
-                    String(singleItem.item_id),
-                    singleItem.image_name,
-                    (existing as any)?.image ?? null,
-                );
-                productData.image = imageMeta;
-                if (productData.variants[0]) {
-                    productData.variants[0].image = imageMeta;
-                }
-            } catch (imgErr: any) {
-                this.logger.warn(`⚠️ Image sync failed for ${singleItem.item_id} (${singleItem.sku}), saving without image: ${imgErr?.message}`);
-                productData.image = (existing as any)?.image ?? null;
-                if (productData.variants[0]) {
-                    productData.variants[0].image = (existing as any)?.variants?.[0]?.image ?? null;
-                }
-            }
-        }
-
-
-        // Preserve existing is_active flag — don't let the sync re-activate
-        // products that were manually deactivated via the whitelist script.
-        if (existing) {
-            productData.is_active = (existing as any).is_active;
-
-            // Preserve existing description if sync produces empty description
-            if (!productData.description && (existing as any).description) {
-                productData.description = (existing as any).description;
-            }
-        }
-
-        await this.productModel.findOneAndUpdate(
-            { zoho_item_id: productId },
-            productData,
-            { upsert: true, new: true },
+      } catch (imgErr: any) {
+        this.logger.warn(
+          `⚠️ Image sync failed for ${singleItem.item_id} (${singleItem.sku}), saving without image: ${imgErr?.message}`,
         );
-
-        this.logger.verbose(
-            `✅ Upserted product ${productId} (${isVariant ? productData.variants.length + ' variants' : 'standalone'})`,
-        );
-    }
-
-
-    private collectS3Keys(product: any): string[] {
-        const keys: string[] = [];
-        if (product?.image?.image_s3_key) keys.push(product.image.image_s3_key);
-        for (const v of product?.variants ?? []) {
-            if (v?.image?.image_s3_key) keys.push(v.image.image_s3_key);
+        productData.image = (existing as any)?.image ?? null;
+        if (productData.variants[0]) {
+          productData.variants[0].image =
+            (existing as any)?.variants?.[0]?.image ?? null;
         }
-        return [...new Set(keys)];
+      }
     }
+
+    // Preserve existing is_active flag — don't let the sync re-activate
+    // products that were manually deactivated via the whitelist script.
+    if (existing) {
+      productData.is_active = (existing as any).is_active;
+
+      // Preserve existing description if sync produces empty description
+      if (!productData.description && (existing as any).description) {
+        productData.description = (existing as any).description;
+      }
+    }
+
+    await this.productModel.findOneAndUpdate(
+      { zoho_item_id: productId },
+      productData,
+      { upsert: true, new: true },
+    );
+
+    this.logger.verbose(
+      `✅ Upserted product ${productId} (${isVariant ? productData.variants.length + ' variants' : 'standalone'})`,
+    );
+  }
+
+  private collectS3Keys(product: any): string[] {
+    const keys: string[] = [];
+    if (product?.image?.image_s3_key) keys.push(product.image.image_s3_key);
+    for (const v of product?.variants ?? []) {
+      if (v?.image?.image_s3_key) keys.push(v.image.image_s3_key);
+    }
+    return [...new Set(keys)];
+  }
 }

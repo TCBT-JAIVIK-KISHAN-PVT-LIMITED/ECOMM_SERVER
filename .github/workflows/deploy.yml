@@ -23,25 +23,26 @@ jobs:
 
             cd /home/ubuntu/app-server
 
-            echo "📥 Pull latest code"
+            echo "Pull latest code"
             git fetch origin
             git checkout main
-            git pull origin main
+            git pull --ff-only origin main
 
-            echo "📦 Install dependencies"
+            echo "Install dependencies"
             npm ci
 
-            echo "🏗️ Build project"
-            NODE_ENV=production npm run build
+            echo "Build project"
+            npm run build
 
-            echo "🔁 Restart PM2"
-            pm2 reload nest-app --update-env || pm2 start dist/main.js --name nest-app --env production
-            pm2 set nest-app NODE_ENV production 2>/dev/null || true
+            echo "Restart PM2"
+            npx pm2 describe tcbt-app-server > /dev/null \
+              && npx pm2 restart tcbt-app-server --update-env \
+              || npx pm2 start ecosystem.config.js --update-env
 
-            echo "💾 Save PM2"
-            pm2 save
+            echo "Save PM2 process list"
+            npx pm2 save
 
-            echo "✅ Production deploy complete"
+            echo "Production deploy complete"
 
       - name: Deploy Testing EC2
         if: github.ref_name == 'staging'
@@ -55,21 +56,23 @@ jobs:
 
             cd /home/ubuntu/app-server
 
-            echo "📥 Pull latest code"
+            echo "Pull latest code"
             git fetch origin
             git checkout staging
-            git pull origin staging
+            git pull --ff-only origin staging
 
-            echo "📦 Install dependencies"
+            echo "Install dependencies"
             npm ci
 
-            echo "🏗️ Build project"
+            echo "Build project"
             npm run build
 
-            echo "🔁 Restart PM2"
-            pm2 reload nest-app --update-env || pm2 start dist/main.js --name nest-app
+            echo "Restart PM2"
+            npx pm2 describe tcbt-app-server > /dev/null \
+              && npx pm2 restart tcbt-app-server --update-env \
+              || npx pm2 start ecosystem.config.js --update-env
 
-            echo "💾 Save PM2"
-            pm2 save
+            echo "Save PM2 process list"
+            npx pm2 save
 
-            echo "✅ Staging deploy complete"
+            echo "Staging deploy complete"

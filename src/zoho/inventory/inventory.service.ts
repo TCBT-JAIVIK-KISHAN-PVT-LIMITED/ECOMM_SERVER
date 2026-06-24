@@ -27,6 +27,8 @@ export class ZohoInventoryService {
   private buildZohoAddress(order: any): ZohoAddressPayload {
     const address = order.address ?? {};
     const line1 = address.addressLine ?? address.line1 ?? address.address;
+    const line2 = address.line2;
+    const fullStreetAddress = line2 ? `${line1}, ${line2}` : line1;
     const phone =
       order.customerMobile ?? address.phone ?? address.receiver_phone;
 
@@ -35,8 +37,12 @@ export class ZohoInventoryService {
     }
 
     const zohoAddress: ZohoAddressPayload = {
-      attention: order.customerName || address.name || undefined,
-      address: line1,
+      attention:
+        order.customerName ||
+        address.receiver_name ||
+        address.name ||
+        undefined,
+      address: fullStreetAddress,
       city: address.city,
       state: address.state,
       zip: address.pincode,

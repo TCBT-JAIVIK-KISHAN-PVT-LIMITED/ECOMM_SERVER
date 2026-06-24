@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, UseGuards, Headers, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  UseGuards,
+  Headers,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CouponService } from './coupon.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -18,10 +26,7 @@ export class CouponController {
   }
 
   @Post()
-  create(
-    @Body() body: any,
-    @Headers('x-admin-key') adminKey: string,
-  ) {
+  create(@Body() body: any, @Headers('x-admin-key') adminKey: string) {
     this.validateAdminKey(adminKey);
     return this.couponService.createCoupon(body);
   }
