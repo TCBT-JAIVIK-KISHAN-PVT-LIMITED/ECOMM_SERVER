@@ -1,75 +1,20 @@
-name: Deploy to EC2
+name: Staging Deployment
 
 on:
   push:
     branches:
-      - main
       - staging
 
 jobs:
-  deploy:
+  verify:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy Production EC2
-        if: github.ref_name == 'main'
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-            cd /home/ubuntu/app-server
-
-            echo "📥 Pull latest code"
-            git fetch origin
-            git checkout main
-            git pull origin main
-
-            echo "📦 Install dependencies"
-            npm ci
-
-            echo "🏗️ Build project"
-            NODE_ENV=production npm run build
-
-            echo "🔁 Restart PM2"
-            pm2 reload nest-app --update-env || pm2 start dist/main.js --name nest-app --env production
-            pm2 set nest-app NODE_ENV production 2>/dev/null || true
-
-            echo "💾 Save PM2"
-            pm2 save
-
-            echo "✅ Production deploy complete"
-
-      - name: Deploy Testing EC2
-        if: github.ref_name == 'staging'
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.TEST_EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.TEST_EC2_SSH_KEY }}
-          script: |
-            set -e
-
-            cd /home/ubuntu/app-server
-
-            echo "📥 Pull latest code"
-            git fetch origin
-            git checkout staging
-            git pull origin staging
-
-            echo "📦 Install dependencies"
-            npm ci
-
-            echo "🏗️ Build project"
-            npm run build
-
-            echo "🔁 Restart PM2"
-            pm2 reload nest-app --update-env || pm2 start dist/main.js --name nest-app
-
-            echo "💾 Save PM2"
-            pm2 save
-
-            echo "✅ Staging deploy complete"
+      - name: Show Branch
+        run: |
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Triggered Successfully"
