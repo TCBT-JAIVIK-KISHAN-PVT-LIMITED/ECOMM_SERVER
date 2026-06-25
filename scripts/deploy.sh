@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -12,6 +11,7 @@ RELEASES_DIR="$APP_DIR/releases"
 CURRENT_LINK="$APP_DIR/current"
 
 APP_NAME="tcbt-app-server"
+
 HEALTH_URL="http://127.0.0.1:3000/auth/health"
 
 KEEP_RELEASES=5
@@ -35,6 +35,8 @@ ARTIFACT="$APP_DIR/artifacts/$ARTIFACT_NAME"
 ########################################
 
 mkdir -p "$APP_DIR/logs"
+
+START_TIME=$(date +%s)
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RELEASE_DIR="$RELEASES_DIR/release_$TIMESTAMP"
@@ -64,13 +66,17 @@ rollback() {
 
     if [ -n "$PREVIOUS_RELEASE" ]; then
 
-        log "Restoring previous release..."
+        log "Rolling back to previous release..."
 
         ln -sfn "$PREVIOUS_RELEASE" "$CURRENT_LINK"
 
         cd "$CURRENT_LINK"
 
-        pm2 startOrReload ecosystem.config.js
+        if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+            pm2 reload ecosystem.config.js
+        else
+            pm2 start ecosystem.config.js
+        fi
 
         log "Rollback completed."
 
@@ -85,7 +91,7 @@ trap rollback ERR
 # Start Deployment
 ########################################
 
-log "======================================"
+log "========================================"
 log "Starting deployment"
 log "Release : $RELEASE_DIR"
 log "Artifact: $ARTIFACT_NAME"
@@ -153,14 +159,28 @@ log "Updating current symlink..."
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
 ########################################
-# Reload PM2
+# Start / Reload PM2
 ########################################
 
 cd "$CURRENT_LINK"
 
-log "Reloading PM2..."
+if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
 
-pm2 startOrReload ecosystem.config.js
+    log "Reloading PM2..."
+
+    pm2 reload ecosystem.config.js
+
+else
+
+    log "Starting PM2..."
+
+    pm2 start ecosystem.config.js
+
+fi
+
+########################################
+# Verify PM2
+########################################
 
 STATUS=$(pm2 jlist | grep "\"name\":\"$APP_NAME\"" | grep "\"status\":\"online\"" || true)
 
@@ -209,9 +229,15 @@ cd "$RELEASES_DIR"
 
 ls -dt release_* 2>/dev/null | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf
 
+COUNT=$(find "$RELEASES_DIR" -maxdepth 1 -type d -name "release_*" | wc -l)
+
+log "Available releases: $COUNT"
+
 pm2 save
 
-log "Deployment completed successfully."
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
 
-log "======================================"
-```
+log "Deployment completed successfully."
+log "Deployment time: ${DURATION}s"
+log "========================================"
