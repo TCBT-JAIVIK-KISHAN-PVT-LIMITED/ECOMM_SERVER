@@ -1,3 +1,4 @@
+```bash
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -7,27 +8,50 @@ set -Eeuo pipefail
 ########################################
 
 APP_DIR="/home/ubuntu/app"
-ARTIFACT="$APP_DIR/artifacts/artifact.tar.gz"
-
 RELEASES_DIR="$APP_DIR/releases"
 CURRENT_LINK="$APP_DIR/current"
 
 APP_NAME="tcbt-app-server"
-
 HEALTH_URL="http://127.0.0.1:3000/auth/health"
 
 KEEP_RELEASES=5
 
+LOG_FILE="$APP_DIR/logs/deploy.log"
+
 ########################################
+# Validate Input
+########################################
+
+if [ $# -ne 1 ]; then
+    echo "Usage: deploy.sh <artifact-name>"
+    exit 1
+fi
+
+ARTIFACT_NAME="$1"
+ARTIFACT="$APP_DIR/artifacts/$ARTIFACT_NAME"
+
+########################################
+# Setup
+########################################
+
+mkdir -p "$APP_DIR/logs"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 RELEASE_DIR="$RELEASES_DIR/release_$TIMESTAMP"
 
 PREVIOUS_RELEASE=""
 
+########################################
+# Logging
+########################################
+
 log() {
-    echo "[$(date '+%F %T')] $1"
+    echo "[$(date '+%F %T')] $1" | tee -a "$LOG_FILE"
 }
+
+########################################
+# Rollback
+########################################
 
 rollback() {
 
@@ -35,17 +59,21 @@ rollback() {
 
     if [ -d "$RELEASE_DIR" ]; then
         rm -rf "$RELEASE_DIR"
-        log "Incomplete release removed."
+        log "Removed failed release."
     fi
 
     if [ -n "$PREVIOUS_RELEASE" ]; then
+
+        log "Restoring previous release..."
+
         ln -sfn "$PREVIOUS_RELEASE" "$CURRENT_LINK"
 
         cd "$CURRENT_LINK"
 
-        pm2 reload ecosystem.config.js || true
+        pm2 startOrReload ecosystem.config.js
 
         log "Rollback completed."
+
     fi
 
     exit 1
@@ -54,21 +82,46 @@ rollback() {
 trap rollback ERR
 
 ########################################
+# Start Deployment
+########################################
+
+log "======================================"
+log "Starting deployment"
+log "Release : $RELEASE_DIR"
+log "Artifact: $ARTIFACT_NAME"
+
+########################################
 # Validation
 ########################################
 
-log "Starting deployment..."
-
 if [ ! -f "$ARTIFACT" ]; then
     log "Artifact not found."
-
     exit 1
 fi
 
-mkdir -p "$RELEASE_DIR"
+if [ ! -f "$APP_DIR/.env" ]; then
+    log ".env file not found."
+    exit 1
+fi
 
 ########################################
-# Extract
+# Save Previous Release
+########################################
+
+if [ -L "$CURRENT_LINK" ]; then
+    PREVIOUS_RELEASE=$(readlink -f "$CURRENT_LINK")
+fi
+
+########################################
+# Create Release
+########################################
+
+mkdir -p "$RELEASE_DIR"
+
+log "Created release directory."
+
+########################################
+# Extract Artifact
 ########################################
 
 log "Extracting artifact..."
@@ -76,17 +129,13 @@ log "Extracting artifact..."
 tar -xzf "$ARTIFACT" -C "$RELEASE_DIR"
 
 ########################################
-# Environment
+# Copy Environment
 ########################################
-if [ ! -f "$APP_DIR/.env" ]; then
-    log ".env file not found."
-    exit 1
-fi
 
 cp "$APP_DIR/.env" "$RELEASE_DIR/.env"
 
 ########################################
-# Install packages
+# Install Dependencies
 ########################################
 
 cd "$RELEASE_DIR"
@@ -96,37 +145,28 @@ log "Installing production dependencies..."
 npm ci --omit=dev
 
 ########################################
-# Save current release
+# Switch Release
 ########################################
 
-if [ -L "$CURRENT_LINK" ]; then
-    PREVIOUS_RELEASE=$(readlink -f "$CURRENT_LINK")
-fi
-
-########################################
-# Switch release
-########################################
+log "Updating current symlink..."
 
 ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
 
 ########################################
-# Start / Reload PM2
+# Reload PM2
 ########################################
 
 cd "$CURRENT_LINK"
 
-if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+log "Reloading PM2..."
 
-    log "Reloading PM2..."
+pm2 startOrReload ecosystem.config.js
 
-    pm2 reload ecosystem.config.js
+STATUS=$(pm2 jlist | grep "\"name\":\"$APP_NAME\"" | grep "\"status\":\"online\"" || true)
 
-else
-
-    log "Starting PM2..."
-
-    pm2 start ecosystem.config.js
-
+if [ -z "$STATUS" ]; then
+    log "PM2 process is not online."
+    exit 1
 fi
 
 ########################################
@@ -135,11 +175,23 @@ fi
 
 log "Waiting for application..."
 
-sleep 8
+HEALTHY=false
 
-log "Running health check..."
+for i in {1..15}; do
 
-curl --fail --silent "$HEALTH_URL" >/dev/null
+    if curl --silent --fail "$HEALTH_URL" >/dev/null; then
+        HEALTHY=true
+        break
+    fi
+
+    sleep 2
+
+done
+
+if [ "$HEALTHY" = false ]; then
+    log "Health check failed."
+    exit 1
+fi
 
 log "Health check passed."
 
@@ -147,12 +199,19 @@ log "Health check passed."
 # Cleanup
 ########################################
 
+log "Removing deployment artifact..."
+
 rm -f "$ARTIFACT"
+
+log "Cleaning old releases..."
 
 cd "$RELEASES_DIR"
 
-ls -dt release_* | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf
+ls -dt release_* 2>/dev/null | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf
 
 pm2 save
 
 log "Deployment completed successfully."
+
+log "======================================"
+```

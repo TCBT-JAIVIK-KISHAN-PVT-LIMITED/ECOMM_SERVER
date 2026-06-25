@@ -26,9 +26,14 @@ jobs:
       - name: Build Application
         run: npm run build
 
+      - name: Generate Artifact Name
+        id: artifact
+        run: |
+          echo "name=artifact_$(date +'%Y%m%d_%H%M%S').tar.gz" >> "$GITHUB_OUTPUT"
+
       - name: Create Deployment Package
         run: |
-          tar -czf artifact.tar.gz \
+          tar -czf "${{ steps.artifact.outputs.name }}" \
             dist \
             package.json \
             package-lock.json \
@@ -41,7 +46,7 @@ jobs:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
-          source: "artifact.tar.gz"
+          source: "${{ steps.artifact.outputs.name }}"
           target: "/home/ubuntu/app/artifacts"
 
       - name: Upload Deployment Scripts
@@ -50,7 +55,7 @@ jobs:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
-          source: "scripts/*"
+          source: "scripts"
           target: "/home/ubuntu/app"
 
       - name: Deploy
@@ -62,7 +67,7 @@ jobs:
           script: |
             mkdir -p /home/ubuntu/app/scripts
             chmod +x /home/ubuntu/app/scripts/*.sh
-            bash /home/ubuntu/app/scripts/deploy.sh
+            bash /home/ubuntu/app/scripts/deploy.sh "${{ steps.artifact.outputs.name }}"
 
       - name: Verify Deployment
         uses: appleboy/ssh-action@v1.2.2
