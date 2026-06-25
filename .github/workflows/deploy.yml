@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy to Staging
 
 on:
   push:
@@ -6,44 +6,69 @@ on:
       - staging
 
 jobs:
-  build:
+  deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - name: Install Dependencies
+        run: npm ci
 
-      - run: npm run build
+      - name: Build Application
+        run: npm run build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nest-build
-          path: |
-            dist
-            package.json
-            package-lock.json
-            ecosystem.config.js
+      - name: Create Deployment Package
+        run: |
+          tar -czf artifact.tar.gz \
+            dist \
+            package.json \
+            package-lock.json \
+            ecosystem.config.js \
             config
 
-  ssh-test:
-    needs: build
-    runs-on: ubuntu-latest
+      - name: Upload Deployment Package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: "artifact.tar.gz"
+          target: "/home/ubuntu/app/artifacts"
 
-    steps:
-      - name: Test SSH Connection
+      - name: Upload Deployment Scripts
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          source: "scripts/*"
+          target: "/home/ubuntu/app"
+
+      - name: Deploy
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
-            echo "Connected Successfully"
-            hostname
-            whoami
-            pwd
+            mkdir -p /home/ubuntu/app/scripts
+            chmod +x /home/ubuntu/app/scripts/*.sh
+            bash /home/ubuntu/app/scripts/deploy.sh
+
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            curl --fail http://127.0.0.1:3000/auth/health
