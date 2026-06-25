@@ -1,3 +1,10 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - staging
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,10 +43,7 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
-            echo "✅ Connected to staging server"
+            echo "Connected Successfully"
             hostname
             whoami
             pwd
-            node -v
-            pm2 -v
-            ls -la /home/ubuntu/app
