@@ -606,10 +606,10 @@ export class ProductSyncService {
       }
     }
 
-    // Preserve existing is_active flag — don't let the sync re-activate
-    // products that were manually deactivated via the whitelist script.
+    // If the product exists in the database, we allow the sync to reactivate it
+    // since it is now in the SKU whitelist and is active in Zoho.
     if (existing) {
-      productData.is_active = (existing as any).is_active;
+      productData.is_active = items.some((i) => i.status === 'active');
 
       // Preserve existing description if sync produces empty description
       if (!productData.description && (existing as any).description) {
