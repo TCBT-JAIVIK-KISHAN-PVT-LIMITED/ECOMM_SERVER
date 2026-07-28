@@ -35,7 +35,13 @@ export class PaymentsController {
 
   @Post('webhook')
   async handleWebhook(@Req() req: RawBodyRequest) {
-    const signature = req.headers['x-zoho-webhook-token'] as string;
+    // Zoho sends signature as 'x-zoho-webhook-signature: t=<ts>,v=<hex>'
+    const sigHeader =
+      (req.headers['x-zoho-webhook-signature'] as string) || '';
+
+    this.logger.log(
+      `[Webhook] x-zoho-webhook-signature: ${sigHeader || '❌ MISSING'}`,
+    );
 
     const secret = this.configService.getOrThrow<string>(
       'ZOHO_PAYMENTS_SIGNING_KEY',
@@ -43,11 +49,28 @@ export class PaymentsController {
 
     const rawBody = req.body as Buffer;
 
-    if (!rawBody) {
+    if (!rawBody || !(rawBody instanceof Buffer)) {
+      this.logger.error('[Webhook] ❌ Missing or non-Buffer raw body');
       throw new UnauthorizedException('Missing raw body');
     }
 
-    if (!this.verifySignature(rawBody, signature, secret)) {
+    // Parse t=<timestamp>,v=<hex> from the header
+    const timestamp = sigHeader.match(/t=(\d+)/)?.[1] ?? '';
+    const receivedV = sigHeader.match(/v=([a-f0-9]+)/i)?.[1] ?? '';
+
+    this.logger.log(`[Webhook] Parsed timestamp: ${timestamp || '❌ MISSING'}`);
+    this.logger.log(`[Webhook] Parsed v: ${receivedV || '❌ MISSING'}`);
+
+    const signatureValid = this.verifySignature(
+      rawBody,
+      timestamp,
+      receivedV,
+      secret,
+    );
+    this.logger.log(`[Webhook] Signature valid? ${signatureValid}`);
+
+    if (!signatureValid) {
+      this.logger.error('[Webhook] ⛔ Invalid signature — rejecting');
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
@@ -60,6 +83,10 @@ export class PaymentsController {
     const paymentId = payment?.payment_id;
     const amount = payment?.amount;
     const orderId = payment?.reference_number;
+
+    this.logger.log(
+      `[Webhook] event_type: ${eventType}, orderId: ${orderId}, paymentId: ${paymentId}`,
+    );
 
     if (!orderId) return { ok: false };
 
@@ -74,20 +101,44 @@ export class PaymentsController {
 
   private verifySignature(
     rawBody: Buffer,
-    signature: string,
+    timestamp: string,
+    receivedV: string,
     secret: string,
   ): boolean {
-    if (!signature) return false;
+    if (!receivedV) {
+      this.logger.warn(
+        '[verifySignature] ⚠️ No v= value in signature header',
+      );
+      return false;
+    }
 
-    const expectedHash = crypto
+    // ✅ CONFIRMED algorithm: HMAC-SHA256(secret, timestamp + "." + rawBody) in hex
+    if (timestamp) {
+      const message = Buffer.concat([Buffer.from(timestamp + '.'), rawBody]);
+      const computed = crypto
+        .createHmac('sha256', secret)
+        .update(message)
+        .digest('hex');
+
+      if (computed.toLowerCase() === receivedV.toLowerCase()) {
+        this.logger.log('[verifySignature] ✅ Matched!');
+        return true;
+      }
+    }
+
+    // Fallback: HMAC-SHA256(secret, rawBody) in hex
+    const fallback = crypto
       .createHmac('sha256', secret)
       .update(rawBody)
-      .digest('base64'); // ✅ Zoho sends base64, not hex
+      .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedHash),
-      Buffer.from(signature),
-    );
+    if (fallback.toLowerCase() === receivedV.toLowerCase()) {
+      this.logger.log('[verifySignature] ✅ Matched on fallback (rawBody only)');
+      return true;
+    }
+
+    this.logger.error('[verifySignature] ❌ No match found');
+    return false;
   }
 
   @UseGuards(JwtAuthGuard)
