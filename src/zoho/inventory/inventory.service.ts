@@ -215,6 +215,7 @@ export class ZohoInventoryService {
       customer_id: customerId,
       reference_number: order.orderId,
       salesperson_name: 'TCBT App',
+      is_inclusive_tax: true,
       line_items: order.items.map((item: any) => ({
         item_id: item.zohoItemId,
         name: item.name,
