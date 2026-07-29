@@ -12,6 +12,60 @@ type ZohoAddressPayload = {
   phone?: string;
 };
 
+function getZohoStateCode(inputState?: string): string {
+  if (!inputState) return '';
+  const clean = inputState.trim();
+  if (clean.length === 2) return clean.toUpperCase();
+
+  const stateMap: Record<string, string> = {
+    'andaman and nicobar islands': 'AN',
+    'andhra pradesh': 'AP',
+    'arunachal pradesh': 'AR',
+    'assam': 'AS',
+    'bihar': 'BR',
+    'chandigarh': 'CH',
+    'chhattisgarh': 'CG',
+    'dadra and nagar haveli': 'DH',
+    'daman and diu': 'DD',
+    'dadra and nagar haveli and daman and diu': 'DD',
+    'delhi': 'DL',
+    'national capital territory of delhi': 'DL',
+    'nct of delhi': 'DL',
+    'goa': 'GA',
+    'gujarat': 'GJ',
+    'haryana': 'HR',
+    'himachal pradesh': 'HP',
+    'jammu and kashmir': 'JK',
+    'jharkhand': 'JH',
+    'karnataka': 'KA',
+    'kerala': 'KL',
+    'ladakh': 'LA',
+    'lakshadweep': 'LD',
+    'madhya pradesh': 'MP',
+    'maharashtra': 'MH',
+    'manipur': 'MN',
+    'meghalaya': 'ML',
+    'mizoram': 'MZ',
+    'nagaland': 'NL',
+    'odisha': 'OD',
+    'orissa': 'OD',
+    'puducherry': 'PY',
+    'pondicherry': 'PY',
+    'punjab': 'PB',
+    'rajasthan': 'RJ',
+    'sikkim': 'SK',
+    'tamil nadu': 'TN',
+    'telangana': 'TS',
+    'tripura': 'TR',
+    'uttar pradesh': 'UP',
+    'uttarakhand': 'UK',
+    'west bengal': 'WB',
+  };
+
+  const lower = clean.toLowerCase();
+  return stateMap[lower] || clean;
+}
+
 @Injectable()
 export class ZohoInventoryService {
   constructor(
@@ -211,11 +265,14 @@ export class ZohoInventoryService {
     const { billingAddressId, shippingAddressId } =
       await this.upsertContactAddresses(customerId, order);
 
-    const payload = {
+    const placeOfSupply = getZohoStateCode(order.address?.state);
+
+    const payload: any = {
       customer_id: customerId,
       reference_number: order.orderId,
       salesperson_name: 'TCBT App',
       is_inclusive_tax: true,
+      ...(placeOfSupply ? { place_of_supply: placeOfSupply } : {}),
       line_items: order.items.map((item: any) => ({
         item_id: item.zohoItemId,
         name: item.name,
