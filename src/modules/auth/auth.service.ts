@@ -380,7 +380,10 @@ export class AuthService {
       sid: session_id,
     });
 
-    return { access_token: access, refresh_token: newRefresh, session_id };
+    // Fetch user so the frontend always has name/email on app restart
+    const user = await this.userModel.findById(sess.uid).select('-otp');
+
+    return { access_token: access, refresh_token: newRefresh, session_id, user };
   }
 
   async logout(session_id: string) {
