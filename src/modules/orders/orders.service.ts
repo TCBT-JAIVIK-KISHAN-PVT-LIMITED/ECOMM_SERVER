@@ -42,10 +42,6 @@ export class OrdersService {
       couponName = null,
     } = dto;
 
-    if (!totalWeight || totalWeight <= 0) {
-      throw new BadRequestException('Invalid total weight from cart');
-    }
-
     let totalAmount = 0;
 
     const processedItems = items.map((item: any) => {
@@ -63,19 +59,25 @@ export class OrdersService {
 
     const discountedAmount = Math.max(totalAmount - discount, 0);
 
-    const type_of_package = totalWeight < 20000 ? 'SPS' : 'B2B';
+    let shippingCharge = 0;
 
-    console.log('Total Weight:', totalWeight);
-    console.log('Type of Package:', type_of_package);
-    console.log('Delivery Pincode:', address.pincode);
-    const shipping = await this.shippingService.calculateRate(
-      totalWeight,
-      Number(address.pincode),
-      type_of_package,
-    );
+    if (totalWeight && totalWeight > 0) {
+      const type_of_package = totalWeight < 20000 ? 'SPS' : 'B2B';
 
-    const shippingCharge = shipping.shippingCharge;
-    console.log('Calculated Shipping Charge:', shippingCharge);
+      console.log('Total Weight:', totalWeight);
+      console.log('Type of Package:', type_of_package);
+      console.log('Delivery Pincode:', address.pincode);
+      const shipping = await this.shippingService.calculateRate(
+        totalWeight,
+        Number(address.pincode),
+        type_of_package,
+      );
+
+      shippingCharge = shipping.shippingCharge;
+      console.log('Calculated Shipping Charge:', shippingCharge);
+    } else {
+      console.log('Total Weight is 0 — skipping ShipMozo API, shipping charge = 0');
+    }
     const finalAmount = discountedAmount + shippingCharge;
 
     const order = await this.orderModel.create({

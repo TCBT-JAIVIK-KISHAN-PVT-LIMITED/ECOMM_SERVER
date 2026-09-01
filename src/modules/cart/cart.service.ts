@@ -240,11 +240,6 @@ export class CartService {
         weight = weightUnit === 'kg' ? rawWeight * 1000 : rawWeight;
       }
 
-      // Fallback: parse weight from product/variant name (e.g. "100ml", "500g", "1kg")
-      if (weight === 0) {
-        weight = this.parseWeightFromName(name || '') || 100; // minimum 100g fallback
-      }
-
       return {
         product_id: i.product_id,
         quantity: i.quantity,
@@ -291,35 +286,6 @@ export class CartService {
       }
     }
     return variant?.name || baseName;
-  }
-
-  /**
-   * Parse weight from a product/variant name string.
-   * Handles: "100ml", "500g", "250gm", "1kg", "1.5 kg", "1l"
-   * Returns weight in grams, or 0 if no recognisable pattern.
-   */
-  private parseWeightFromName(name: string): number {
-    if (!name) return 0;
-    const str = name.toLowerCase();
-
-    // Match number followed by unit anywhere in the string
-    const match = str.match(/([\d.]+)\s*(kg|g|gm|ml|l)\b/);
-    if (!match) return 0;
-
-    const value = parseFloat(match[1]);
-    const suffix = match[2];
-
-    switch (suffix) {
-      case 'kg':
-      case 'l':
-        return value * 1000;
-      case 'g':
-      case 'gm':
-      case 'ml':
-        return value;
-      default:
-        return 0;
-    }
   }
 
   async mergeGuestIntoUser(guestSessionId: string, userId: string) {
