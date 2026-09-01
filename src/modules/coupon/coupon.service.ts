@@ -1,6 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import axios from 'axios';
 import { Model } from 'mongoose';
 import { Coupon } from './schema/coupon.schema';
 

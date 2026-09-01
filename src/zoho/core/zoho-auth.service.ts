@@ -131,19 +131,4 @@ export class ZohoAuthService {
 
     return data;
   }
-
-  // 🔥 OPTIONAL: AUTH URL GENERATOR (KEEP HERE)
-  getAuthUrl(service: ZohoService) {
-    const scopeMap = {
-      crm: 'ZohoCRM.modules.ALL',
-      inventory: 'ZohoInventory.fullaccess.all',
-      payments: 'ZohoPay.payments.CREATE',
-    };
-
-    const clientId = this.configService.getOrThrow<string>('ZOHO_CLIENT_ID');
-    const redirectUri =
-      this.configService.getOrThrow<string>('ZOHO_REDIRECT_URI');
-
-    return `https://accounts.zoho.in/oauth/v2/auth?scope=${scopeMap[service]}&client_id=${clientId}&response_type=code&access_type=offline&redirect_uri=${redirectUri}&state=${service}`;
-  }
 }

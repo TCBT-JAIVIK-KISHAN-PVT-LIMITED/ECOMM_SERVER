@@ -4,7 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ZohoModule } from './zoho/zoho.module';
 import { ProductsModule } from './modules/products/products.module';
-import { ScheduleModule } from '@nestjs/schedule';
+
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -15,7 +15,7 @@ import { CategoryModule } from './modules/categories/categories.module';
 import { RedisModule } from './common/redis/redis.module';
 import { CartModule } from './modules/cart/cart.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
-import { ZohoImageSyncModule } from './integrations/zoho-image-sync/zoho-image-sync.module';
+
 import { ZohoPaymentsModule } from './zoho/payments/payments.module';
 import { ShippingModule } from './integrations/shipping/shipping.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -38,7 +38,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     ZohoModule,
     ZohoPaymentsModule,
     ProductsModule,
-    ScheduleModule.forRoot(),
+
     OrdersModule,
     UsersModule,
     AuthModule,
@@ -46,7 +46,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     RedisModule,
     CartModule,
     WishlistModule,
-    ZohoImageSyncModule,
+
     ShippingModule,
   ],
   controllers: [AppController, CallbackController],

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Order } from './schemas/order.schema';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { ZohoPaymentGatewayService } from '../../integrations/payments/zoho-payment-gateway.service';
 import { User } from '../users/schemas/user.schema';
@@ -223,7 +223,10 @@ export class OrdersService {
     paymentId: string,
     amount: number,
   ) {
-    const order = await this.orderModel.findOne({ orderId });
+    const isObjectId = Types.ObjectId.isValid(orderId);
+    const order = await this.orderModel.findOne({
+      $or: [{ orderId }, ...(isObjectId ? [{ _id: orderId }] : [])],
+    });
 
     if (!order) throw new Error('Order not found');
 
@@ -312,12 +315,31 @@ export class OrdersService {
   }
 
   async verifyAndConfirmOrder(orderId: string, userId?: string): Promise<any> {
-    const order = await this.orderModel.findOne({ orderId });
+    const cleanId = orderId?.trim();
+    const isObjectId = Types.ObjectId.isValid(cleanId);
 
-    if (!order) throw new NotFoundException('Order not found');
+    console.log(
+      `🔍 [verifyAndConfirmOrder] Querying order: "${cleanId}" (isObjectId: ${isObjectId}, userId: ${userId || 'none'})`,
+    );
+
+    const order = await this.orderModel.findOne({
+      $or: [
+        { orderId: cleanId },
+        { orderId: { $regex: new RegExp(`^${cleanId}$`, 'i') } },
+        ...(isObjectId ? [{ _id: new Types.ObjectId(cleanId) }] : []),
+      ],
+    });
+
+    if (!order) {
+      console.error(`❌ [verifyAndConfirmOrder] Order "${cleanId}" not found in DB`);
+      throw new NotFoundException('Order not found');
+    }
 
     // Ownership check — if userId is provided, verify the caller owns this order
-    if (userId && order.userId !== userId) {
+    if (userId && order.userId?.toString() !== userId.toString()) {
+      console.error(
+        `❌ [verifyAndConfirmOrder] Ownership mismatch! Order userId: ${order.userId}, caller userId: ${userId}`,
+      );
       throw new NotFoundException('Order not found');
     }
 

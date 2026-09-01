@@ -10,8 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { User } from '../users/schemas/user.schema';
-import { CrmService } from '../../zoho/crm/crm.service';
-import { ZohoAuthService } from '../../zoho/core/zoho-auth.service';
+
 import { RedisService } from '../../common/redis/redis.service';
 import { CartService } from '../cart/cart.service';
 import axios from 'axios';
@@ -52,8 +51,6 @@ export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-    private zohoCRMService: CrmService,
-    private zohoService: ZohoAuthService,
     private redis: RedisService,
     private cartService: CartService,
   ) {}

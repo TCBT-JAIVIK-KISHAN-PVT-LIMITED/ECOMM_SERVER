@@ -1,14 +1,9 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 
 import { Product, ProductSchema } from './schemas/product.schema';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
-
-import { ZohoModule } from '../../zoho/zoho.module';
-import { ZohoImageSyncModule } from '../../integrations/zoho-image-sync/zoho-image-sync.module';
-
-import { ProductSyncService } from './product-sync.service';
 
 @Module({
   imports: [
@@ -18,16 +13,12 @@ import { ProductSyncService } from './product-sync.service';
         schema: ProductSchema,
       },
     ]),
-
-    ZohoModule,
-
-    forwardRef(() => ZohoImageSyncModule),
   ],
 
   controllers: [ProductsController],
 
-  providers: [ProductsService, ProductSyncService],
+  providers: [ProductsService],
 
-  exports: [ProductsService, ProductSyncService],
+  exports: [ProductsService],
 })
 export class ProductsModule {}

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Product } from './schemas/product.schema';
@@ -30,7 +30,6 @@ type ProductMongoFilter = {
  */
 @Injectable()
 export class ProductsService {
-  private readonly logger = new Logger(ProductsService.name);
 
   constructor(
     @InjectModel(Product.name)

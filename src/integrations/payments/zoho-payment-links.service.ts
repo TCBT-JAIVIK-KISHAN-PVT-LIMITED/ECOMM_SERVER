@@ -80,35 +80,4 @@ export class ZohoPaymentLinksService {
       throw error;
     }
   }
-
-  async getPaymentLink(paymentLinkId: string) {
-    const accessToken = await this.zohoPaymentsService.getValidAccessToken();
-
-    const accountId = this.configService.get<string>(
-      'ZOHO_PAYMENTS_ACCOUNT_ID',
-    );
-
-    try {
-      // This endpoint was already correct: /paymentlinks/{id}
-      const response = await axios.get(
-        `https://payments.zoho.in/api/v1/paymentlinks/${paymentLinkId}?account_id=${accountId}`,
-        {
-          headers: {
-            Authorization: `Zoho-oauthtoken ${accessToken}`,
-          },
-        },
-      );
-
-      return response.data;
-    } catch (error: unknown) {
-      const err = error as AxiosError;
-
-      console.error(
-        'Get Payment Link Error:',
-        err.response?.data || err.message,
-      );
-
-      throw error;
-    }
-  }
 }

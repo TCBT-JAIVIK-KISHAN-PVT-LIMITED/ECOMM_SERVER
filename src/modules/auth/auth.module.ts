@@ -4,7 +4,7 @@ import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../users/schemas/user.schema';
-import { ZohoModule } from '../../zoho/zoho.module';
+
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RedisModule } from '../../common/redis/redis.module';
 import { PassportModule } from '@nestjs/passport';
@@ -15,7 +15,7 @@ import { CartModule } from '../cart/cart.module';
   imports: [
     ConfigModule,
     PassportModule,
-    ZohoModule,
+
     RedisModule,
     CartModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
