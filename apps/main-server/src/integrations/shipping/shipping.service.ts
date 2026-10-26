@@ -55,10 +55,14 @@ export class ShippingService {
       if (axios.isAxiosError(error)) {
         const err = error as AxiosError;
 
-        this.logger.error('Shipping microservice call failed', {
-          data: err.response?.data,
-          status: err.response?.status,
-        });
+        this.logger.error(
+          `Shipping microservice call failed: ${err.message}`,
+          {
+            code: err.code,
+            data: err.response?.data,
+            status: err.response?.status,
+          },
+        );
 
         throw new HttpException(
           {

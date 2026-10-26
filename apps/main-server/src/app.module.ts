@@ -15,6 +15,7 @@ import { CategoryModule } from './modules/categories/categories.module';
 import { RedisModule } from './common/redis/redis.module';
 import { CartModule } from './modules/cart/cart.module';
 import { WishlistModule } from './modules/wishlist/wishlist.module';
+import { EducationModule } from './modules/education/education.module';
 
 import { ZohoPaymentsModule } from './zoho/payments/payments.module';
 import { ShippingModule } from './integrations/shipping/shipping.module';
@@ -48,6 +49,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
     WishlistModule,
 
     ShippingModule,
+    EducationModule,
   ],
   controllers: [AppController, CallbackController],
   providers: [

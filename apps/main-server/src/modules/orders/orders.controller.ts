@@ -9,6 +9,7 @@ import {
   UseGuards,
   UnauthorizedException,
   Body,
+  Headers,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -61,4 +62,30 @@ export class OrdersController {
 
     return this.ordersService.cancelOrder(userId, orderId);
   }
+
+  // ── Admin: Retry Zoho sync for a single order ──────────────────────
+  @Post('admin/retry-zoho-sync/:orderId')
+  async retryZohoSync(
+    @Param('orderId') orderId: string,
+    @Headers('x-admin-key') adminKey: string,
+  ) {
+    if (adminKey !== process.env.ADMIN_API_KEY) {
+      throw new UnauthorizedException('Invalid admin key');
+    }
+
+    return this.ordersService.retryZohoSync(orderId);
+  }
+
+  // ── Admin: Retry Zoho sync for ALL failed orders ───────────────────
+  @Post('admin/retry-zoho-sync-all')
+  async retryAllFailedZohoSync(
+    @Headers('x-admin-key') adminKey: string,
+  ) {
+    if (adminKey !== process.env.ADMIN_API_KEY) {
+      throw new UnauthorizedException('Invalid admin key');
+    }
+
+    return this.ordersService.retryAllFailedZohoSync();
+  }
 }
+

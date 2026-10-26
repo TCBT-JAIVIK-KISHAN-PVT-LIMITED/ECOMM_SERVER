@@ -36,18 +36,18 @@ export class ShippingAggregatorService {
 
   async calculateRate(request: ShippingRateRequest) {
     const { weight } = request;
-    const primaryProvider =
-      (this.configService.get<string>('PRIMARY_SHIPPING_PROVIDER') || 'legacy').toLowerCase();
 
     this.logger.log(
-      `Rate request: weight=${weight}g, pickup=${request.pickupPincode}, delivery=${request.deliveryPincode}, mode=${primaryProvider}`,
+      `Rate request: weight=${weight}g, pickup=${request.pickupPincode}, delivery=${request.deliveryPincode}, packageType=${request.packageType}`,
     );
 
     try {
-      if (primaryProvider === 'shipwala') {
-        return await this.routeViaShipwale(request);
+      if (weight < this.WEIGHT_THRESHOLD_GRAMS) {
+        // Below 10 kg (< 10,000 g) → BigShip
+        return await this.routeViaBigShip(request);
       } else {
-        return await this.routeViaLegacy(request);
+        // 10 kg and above (>= 10,000 g) → Shipwala
+        return await this.routeViaShipwale(request);
       }
     } catch (error: any) {
       if (error instanceof HttpException) throw error;
@@ -68,51 +68,51 @@ export class ShippingAggregatorService {
     }
   }
 
-  // ─── Shipwale Primary Route ──────────────────────────────────────────────
+  // ─── Shipwale Route (>= 10 kg) ──────────────────────────────────────────
 
   private async routeViaShipwale(request: ShippingRateRequest) {
-    if (!this.shipwalaProvider.isAvailable()) {
-      this.logger.warn(
-        'Shipwale is primary but not configured — falling back to legacy routing',
-      );
-      return this.routeViaLegacy(request);
-    }
-
-    this.logger.log('Routing to Shipwale (primary provider)');
-
-    let rates = await this.shipwalaProvider.calculateRate(request);
-
-    if (!rates.length) {
-      this.logger.warn(
-        'Shipwale returned no rates — falling back to legacy routing',
-      );
-      return this.routeViaLegacy(request);
-    }
-
-    // Pick cheapest available rate
-    const best = rates.reduce((min, curr) =>
-      curr.totalCharges < min.totalCharges ? curr : min,
+    this.logger.log(
+      `Weight ${request.weight}g (>= ${this.WEIGHT_THRESHOLD_GRAMS}g) → routing to Shipwala`,
     );
 
-    return {
-      success: true,
-      shippingCharge: Math.ceil(best.totalCharges),
-      courier: best.courier,
-      provider: best.provider,
-      estimatedDelivery: best.estimatedDelivery,
-      allRates: rates,
-    };
-  }
-
-  // ─── Legacy Route (BigShip / ShipMozo) ──────────────────────────────────
-
-  private async routeViaLegacy(request: ShippingRateRequest) {
-    const { weight } = request;
-
-    if (weight < this.WEIGHT_THRESHOLD_GRAMS) {
-      return this.routeViaBigShip(request);
-    } else {
+    if (!this.shipwalaProvider.isAvailable()) {
+      this.logger.warn(
+        'Shipwala not configured — falling back to ShipMozo',
+      );
       return this.routeViaShipMozo(request);
+    }
+
+    try {
+      const rates = await this.shipwalaProvider.calculateRate(request);
+
+      if (!rates.length) {
+        this.logger.warn(
+          'Shipwala returned no rates — falling back to ShipMozo',
+        );
+        return this.routeViaShipMozo(request);
+      }
+
+      // Pick cheapest available rate
+      const best = rates.reduce((min, curr) =>
+        curr.totalCharges < min.totalCharges ? curr : min,
+      );
+
+      return {
+        success: true,
+        shippingCharge: Math.ceil(best.totalCharges),
+        courier: best.courier,
+        provider: best.provider,
+        estimatedDelivery: best.estimatedDelivery,
+        allRates: rates,
+      };
+    } catch (error: any) {
+      this.logger.error(
+        `Shipwala failed (${error.message}) — falling back to ShipMozo`,
+      );
+      if (this.shipMozoProvider.isAvailable()) {
+        return this.routeViaShipMozo(request);
+      }
+      throw error;
     }
   }
 
@@ -135,7 +135,16 @@ export class ShippingAggregatorService {
       );
     }
 
-    const rates = await this.bigShipProvider.calculateRate(request);
+    let rates: any[] = [];
+    try {
+      rates = await this.bigShipProvider.calculateRate(request);
+    } catch (err: any) {
+      this.logger.warn(`BigShip error (${err.message}) — falling back to Shipwala`);
+      if (this.shipwalaProvider.isAvailable()) {
+        return this.routeViaShipwale(request);
+      }
+      throw err;
+    }
 
     if (!rates.length) {
       // Try Shipwale as fallback
@@ -143,20 +152,7 @@ export class ShippingAggregatorService {
         this.logger.warn(
           'BigShip returned no rates — trying Shipwale as fallback',
         );
-        const swRates = await this.shipwalaProvider.calculateRate(request);
-        if (swRates.length) {
-          const best = swRates.reduce((min, curr) =>
-            curr.totalCharges < min.totalCharges ? curr : min,
-          );
-          return {
-            success: true,
-            shippingCharge: Math.ceil(best.totalCharges),
-            courier: best.courier,
-            provider: best.provider,
-            estimatedDelivery: best.estimatedDelivery,
-            allRates: swRates,
-          };
-        }
+        return this.routeViaShipwale(request);
       }
       throw new HttpException(
         'No shipping rates available from BigShip',

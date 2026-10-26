@@ -117,6 +117,7 @@ export class ShipwalaProvider implements ShippingProvider {
 
   constructor(private configService: ConfigService) {
     const baseURL =
+      this.configService.get<string>('SHIPWALE_BASE_URL') ||
       this.configService.get<string>('SHIPWALA_BASE_URL') ||
       'https://api.shipwale.com';
 
@@ -132,9 +133,15 @@ export class ShipwalaProvider implements ShippingProvider {
   // ─── Availability Check ──────────────────────────────────────────────────
 
   isAvailable(): boolean {
-    const staticKey = this.configService.get<string>('SHIPWALA_API_KEY');
-    const email = this.configService.get<string>('SHIPWALA_EMAIL');
-    const password = this.configService.get<string>('SHIPWALA_PASSWORD');
+    const staticKey =
+      this.configService.get<string>('SHIPWALE_API_KEY') ||
+      this.configService.get<string>('SHIPWALA_API_KEY');
+    const email =
+      this.configService.get<string>('SHIPWALE_EMAIL') ||
+      this.configService.get<string>('SHIPWALA_EMAIL');
+    const password =
+      this.configService.get<string>('SHIPWALE_PASSWORD') ||
+      this.configService.get<string>('SHIPWALA_PASSWORD');
     // Available if either a static key is set OR email+password are both set
     return !!(staticKey || (email && password));
   }
@@ -145,11 +152,13 @@ export class ShipwalaProvider implements ShippingProvider {
    * Returns a valid Bearer token.
    * Priority:
    *  1. Cached token (if not expired)
-   *  2. Static SHIPWALA_API_KEY
+   *  2. Static SHIPWALE_API_KEY / SHIPWALA_API_KEY
    *  3. Auto-login via email + password
    */
   async getToken(): Promise<string> {
-    const staticKey = this.configService.get<string>('SHIPWALA_API_KEY');
+    const staticKey =
+      this.configService.get<string>('SHIPWALE_API_KEY') ||
+      this.configService.get<string>('SHIPWALA_API_KEY');
 
     // If a static key exists, use it directly
     if (staticKey) {
@@ -169,14 +178,20 @@ export class ShipwalaProvider implements ShippingProvider {
   }
 
   private async login(): Promise<string> {
-    const email = this.configService.get<string>('SHIPWALA_EMAIL');
-    const password = this.configService.get<string>('SHIPWALA_PASSWORD');
+    const email =
+      this.configService.get<string>('SHIPWALE_EMAIL') ||
+      this.configService.get<string>('SHIPWALA_EMAIL');
+    const password =
+      this.configService.get<string>('SHIPWALE_PASSWORD') ||
+      this.configService.get<string>('SHIPWALA_PASSWORD');
     const expiryDays =
-      this.configService.get<number>('SHIPWALA_EXPIRY_DAYS') || 30;
+      this.configService.get<number>('SHIPWALE_EXPIRY_DAYS') ||
+      this.configService.get<number>('SHIPWALA_EXPIRY_DAYS') ||
+      30;
 
     if (!email || !password) {
       throw new Error(
-        'Shipwale credentials not configured. Set SHIPWALA_EMAIL + SHIPWALA_PASSWORD or SHIPWALA_API_KEY.',
+        'Shipwale credentials not configured. Set SHIPWALE_EMAIL + SHIPWALE_PASSWORD or SHIPWALE_API_KEY.',
       );
     }
 
@@ -275,6 +290,18 @@ export class ShipwalaProvider implements ShippingProvider {
     }
 
     const availableRates: ShipwaleRate[] = data?.data?.available_rates || [];
+
+    this.logger.log(
+      `Shipwale returned ${availableRates.length} rates: ${JSON.stringify(
+        availableRates.map((r) => ({
+          courier: r.courier_name,
+          charge: r.total_shipping_charge,
+          slab: r.weight_slab,
+          mode: r.service_mode,
+        })),
+      )}`,
+    );
+    this.logger.log(`Shipwale raw response data: ${JSON.stringify(data?.data)}`);
 
     if (!availableRates.length) {
       this.logger.warn('Shipwale returned empty available_rates');
@@ -404,7 +431,7 @@ export class ShipwalaProvider implements ShippingProvider {
     return response.data;
   }
 
-  // ─── Live Tracking ────────────────────────────────────────────────────────
+  // ─── Live Tracking ─────────────────────────────────────        ────────
 
   /**
    * Query real-time shipment tracking.

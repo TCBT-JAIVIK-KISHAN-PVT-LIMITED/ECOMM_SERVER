@@ -14,6 +14,30 @@ export class UsersController {
     return this.usersService.enrollCourse(target, body.course_id);
   }
 
+  @Post('enroll-batch')
+  async enrollBatch(
+    @Body()
+    body: {
+      mobile_numbers: string[];
+      course_id?: string;
+    },
+  ) {
+    const courseId = body.course_id || 'tcbt-organic-farming-101';
+    const numbers = body.mobile_numbers || [];
+    const results: any[] = [];
+
+    for (const mobile of numbers) {
+      try {
+        const res = await this.usersService.enrollCourse(mobile, courseId);
+        results.push({ mobile, success: res.success, message: res.message });
+      } catch (err: any) {
+        results.push({ mobile, success: false, error: err.message });
+      }
+    }
+
+    return { total: results.length, courseId, results };
+  }
+
   @Get(':id/courses')
   getUserCourses(@Param('id') id: string) {
     return this.usersService.getUserEnrolledCourses(id);

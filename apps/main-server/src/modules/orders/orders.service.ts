@@ -62,7 +62,7 @@ export class OrdersService {
     let shippingCharge = 0;
 
     if (totalWeight && totalWeight > 0) {
-      const type_of_package = totalWeight < 20000 ? 'SPS' : 'B2B';
+      const type_of_package = totalWeight < 10000 ? 'SPS' : 'B2B';
 
       console.log('Total Weight:', totalWeight);
       console.log('Type of Package:', type_of_package);
@@ -405,5 +405,136 @@ export class OrdersService {
 
     order.paymentStatus = 'failed';
     await order.save();
+  }
+
+  /**
+   * Retry Zoho sync for a single order that previously failed.
+   * Only works on paid orders that haven't been synced yet.
+   */
+  async retryZohoSync(orderId: string) {
+    const order = await this.orderModel.findOne({
+      $or: [{ orderId }, { _id: Types.ObjectId.isValid(orderId) ? new Types.ObjectId(orderId) : undefined }].filter(Boolean),
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order "${orderId}" not found`);
+    }
+
+    if (order.paymentStatus !== 'paid') {
+      throw new BadRequestException(
+        `Order "${orderId}" payment status is "${order.paymentStatus}", not "paid"`,
+      );
+    }
+
+    if (order.isSyncedToZoho) {
+      return {
+        message: `Order "${orderId}" is already synced to Zoho`,
+        zohoSalesOrderId: order.zohoSalesOrderId,
+        zohoInvoiceId: order.zohoInvoiceId,
+      };
+    }
+
+    const user = await this.userModel.findById(order.userId);
+
+    if (!user) {
+      throw new NotFoundException(`User not found for order "${orderId}"`);
+    }
+
+    // Ensure Zoho contact exists
+    let zohoContactId = user.zoho_contact_id;
+
+    if (!zohoContactId) {
+      console.log(
+        `[RetrySync] No zoho_contact_id for user ${order.userId}, creating...`,
+      );
+      zohoContactId = await this.zohoInventoryService.createOrGetContact({
+        name: user?.name,
+        mobile_number: user?.mobile_number,
+        email: user?.email,
+      });
+
+      await this.userModel.findByIdAndUpdate(order.userId, {
+        zoho_contact_id: zohoContactId,
+      });
+      console.log(
+        `[RetrySync] Saved zoho_contact_id ${zohoContactId} to user ${order.userId}`,
+      );
+    }
+
+    // Attach customer metadata
+    (order as any).customerName = user.name || '';
+    (order as any).customerMobile = user.mobile_number || '';
+
+    const result =
+      await this.zohoInventoryService.createSalesOrderWithInvoice(
+        order,
+        zohoContactId,
+      );
+
+    order.zohoSalesOrderId = result.salesOrderId;
+    order.zohoInvoiceId = result.invoiceId;
+    order.zohoInvoiceNumber = result.invoiceNumber;
+    order.zohoPaymentId = result.paymentId;
+    order.isSyncedToZoho = true;
+    order.zohoSyncError = undefined;
+    order.orderStatus = 'processing';
+
+    await order.save();
+
+    console.log(
+      `[RetrySync] ✅ Order "${orderId}" synced — SO: ${result.salesOrderId}, Invoice: ${result.invoiceNumber}`,
+    );
+
+    return {
+      message: `Order "${orderId}" synced successfully`,
+      salesOrderId: result.salesOrderId,
+      invoiceId: result.invoiceId,
+      invoiceNumber: result.invoiceNumber,
+      paymentId: result.paymentId,
+    };
+  }
+
+  /**
+   * Retry Zoho sync for ALL paid orders that haven't been synced yet.
+   */
+  async retryAllFailedZohoSync() {
+    const failedOrders = await this.orderModel.find({
+      paymentStatus: 'paid',
+      isSyncedToZoho: { $ne: true },
+    });
+
+    console.log(
+      `[RetrySync] Found ${failedOrders.length} orders pending Zoho sync`,
+    );
+
+    const results: { orderId: string; status: string; error?: string }[] = [];
+
+    for (const order of failedOrders) {
+      try {
+        const result = await this.retryZohoSync(order.orderId);
+        results.push({
+          orderId: order.orderId,
+          status: 'success',
+          ...result,
+        });
+      } catch (err: any) {
+        console.error(
+          `[RetrySync] ❌ Failed for "${order.orderId}":`,
+          err.message,
+        );
+        results.push({
+          orderId: order.orderId,
+          status: 'failed',
+          error: err.message,
+        });
+      }
+    }
+
+    return {
+      total: failedOrders.length,
+      succeeded: results.filter((r) => r.status === 'success').length,
+      failed: results.filter((r) => r.status === 'failed').length,
+      results,
+    };
   }
 }
