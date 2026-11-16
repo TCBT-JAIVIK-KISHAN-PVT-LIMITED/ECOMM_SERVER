@@ -3,7 +3,7 @@ import { ReferralService } from './referral.service';
 
 @Controller('referrals')
 export class ReferralController {
-  constructor(private readonly referralService: ReferralService) {}
+  constructor(private readonly referralService: ReferralService) { }
 
   /**
    * GET /referrals/leaderboard?userId=...

@@ -30,7 +30,7 @@ export class ReferralService {
     private winnerModel: Model<WeeklyReferralWinner>,
     @InjectModel(User.name) private userModel: Model<User>,
     private readonly redis: RedisService,
-  ) {}
+  ) { }
 
   /**
    * Computes Monday 00:00:00 IST to Sunday 23:59:59.999 IST for a given date.
@@ -284,7 +284,7 @@ export class ReferralService {
           `referral:device:${cleanDeviceId}`,
           referee._id.toString(),
         );
-      } catch (_) {}
+      } catch (_) { }
     }
 
     return {
@@ -506,11 +506,11 @@ export class ReferralService {
           already_referred: Boolean(userDoc.referred_by),
           won_week: wonRecord
             ? {
-                week_key: wonRecord.week_key,
-                prize_name: wonRecord.prize_name,
-                referral_count: wonRecord.referral_count,
-                contact_status: wonRecord.contact_status,
-              }
+              week_key: wonRecord.week_key,
+              prize_name: wonRecord.prize_name,
+              referral_count: wonRecord.referral_count,
+              contact_status: wonRecord.contact_status,
+            }
             : null,
         };
       }
