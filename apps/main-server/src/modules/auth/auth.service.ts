@@ -267,6 +267,17 @@ export class AuthService {
     const user = await this.userModel.findOne({ mobile_number: mobile }); // ✅ FIX
     if (!user) throw new UnauthorizedException('User not found');
 
+    if (!user.referral_code) {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const digits = (user.mobile_number || '').replace(/\D/g, '');
+      const suffix = digits.length >= 2 ? digits.slice(-2) : '99';
+      let rand = '';
+      for (let i = 0; i < 4; i++) {
+        rand += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      user.referral_code = `TCBT${rand}${suffix}`;
+    }
+
     user.last_login_at = new Date();
     user.otp = null;
     await user.save();
@@ -380,7 +391,12 @@ export class AuthService {
     // Fetch user so the frontend always has name/email on app restart
     const user = await this.userModel.findById(sess.uid).select('-otp');
 
-    return { access_token: access, refresh_token: newRefresh, session_id, user };
+    return {
+      access_token: access,
+      refresh_token: newRefresh,
+      session_id,
+      user,
+    };
   }
 
   async logout(session_id: string) {

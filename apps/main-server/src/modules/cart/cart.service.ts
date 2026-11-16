@@ -57,6 +57,35 @@ export class CartService {
       throw new BadRequestException('Invalid quantity');
     }
 
+    // Use the productId string directly as the cart key (works for both _id and zoho_item_id)
+    const cartKey = productId;
+
+    // Deduplicate: merge any duplicate entries for the same product_id
+    // (can happen after ObjectId→String schema migration)
+    const deduped = new Map<string, number>();
+    for (const item of cart.items) {
+      const key = item.product_id.toString();
+      deduped.set(key, (deduped.get(key) ?? 0) + item.quantity);
+    }
+    if (deduped.size < cart.items.length) {
+      cart.items = Array.from(deduped.entries()).map(
+        ([pid, qty]) => ({ product_id: pid, quantity: qty }) as any,
+      );
+    }
+
+    const idx = cart.items.findIndex(
+      (i) => i.product_id.toString() === cartKey,
+    );
+
+    // Allow removing an item even if the product was deleted, deactivated, or is out of stock
+    if (quantity === 0) {
+      if (idx >= 0) {
+        cart.items.splice(idx, 1);
+        await cart.save();
+      }
+      return this.getCartSummary(cart);
+    }
+
     // Resolve product — supports Mongo _id, zoho_item_id, or variant zoho_item_id
     const { product, variantId } = await this.resolveProduct(productId);
 
@@ -83,29 +112,7 @@ export class CartService {
       throw new BadRequestException('Insufficient stock');
     }
 
-    // Use the productId string directly as the cart key (works for both _id and zoho_item_id)
-    const cartKey = productId;
-
-    // Deduplicate: merge any duplicate entries for the same product_id
-    // (can happen after ObjectId→String schema migration)
-    const deduped = new Map<string, number>();
-    for (const item of cart.items) {
-      const key = item.product_id.toString();
-      deduped.set(key, (deduped.get(key) ?? 0) + item.quantity);
-    }
-    if (deduped.size < cart.items.length) {
-      cart.items = Array.from(deduped.entries()).map(
-        ([pid, qty]) => ({ product_id: pid, quantity: qty }) as any,
-      );
-    }
-
-    const idx = cart.items.findIndex(
-      (i) => i.product_id.toString() === cartKey,
-    );
-
-    if (quantity === 0) {
-      if (idx >= 0) cart.items.splice(idx, 1);
-    } else if (idx >= 0) {
+    if (idx >= 0) {
       cart.items[idx].quantity = quantity;
     } else {
       cart.items.push({
@@ -222,11 +229,21 @@ export class CartService {
       }
     }
 
-    const detailed = items.map((i) => {
+    // Filter out stale/deleted/inactive products and clean up the cart if any were found
+    const validItems = items.filter((i) =>
+      lookupMap.has(i.product_id.toString()),
+    );
+
+    if (validItems.length < items.length) {
+      cart.items = validItems as any;
+      await cart.save();
+    }
+
+    const detailed = validItems.map((i) => {
       const cartKey = i.product_id.toString();
-      const entry = lookupMap.get(cartKey);
-      const p = entry?.product;
-      const v = entry?.variant;
+      const entry = lookupMap.get(cartKey)!;
+      const p = entry.product;
+      const v = entry.variant;
 
       // Use variant data if available, otherwise parent product
       const price = v?.price ?? p?.price ?? 0;

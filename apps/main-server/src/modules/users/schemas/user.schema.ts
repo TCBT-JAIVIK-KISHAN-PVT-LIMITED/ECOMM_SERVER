@@ -83,6 +83,15 @@ export class User {
 
   @Prop()
   zoho_contact_id?: string;
+
+  @Prop({ unique: true, sparse: true, index: true })
+  referral_code?: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  referred_by?: Types.ObjectId | null;
+
+  @Prop()
+  referred_at?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

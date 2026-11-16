@@ -296,7 +296,11 @@ export class UsersService {
       { new: true },
     );
 
-    return { success: true, message: 'Course enrolled successfully', user: updatedUser };
+    return {
+      success: true,
+      message: 'Course enrolled successfully',
+      user: updatedUser,
+    };
   }
 
   // 🔹 Get user's enrolled courses
@@ -305,7 +309,9 @@ export class UsersService {
     if (!Types.ObjectId.isValid(cleanId)) {
       return { enrolled_courses: [] };
     }
-    const user = await this.userModel.findById(cleanId).select('enrolled_courses');
+    const user = await this.userModel
+      .findById(cleanId)
+      .select('enrolled_courses');
     return { enrolled_courses: user?.enrolled_courses || [] };
   }
 }

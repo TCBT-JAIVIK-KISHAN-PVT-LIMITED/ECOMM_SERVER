@@ -71,7 +71,10 @@ export class ShippingController {
       );
     }
     const comprehensive = full === 'true' || full === '1';
-    const data = await this.shipwalaProvider.getTracking(identifier, comprehensive);
+    const data = await this.shipwalaProvider.getTracking(
+      identifier,
+      comprehensive,
+    );
     return { success: true, data };
   }
 

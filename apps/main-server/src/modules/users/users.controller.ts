@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Patch, Body, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AddAddressDto } from './dto/add-address.dto';
 
@@ -8,7 +16,12 @@ export class UsersController {
 
   @Post('enroll')
   enrollCourse(
-    @Body() body: { mobile_number?: string; user_id?: string; course_id: string },
+    @Body()
+    body: {
+      mobile_number?: string;
+      user_id?: string;
+      course_id: string;
+    },
   ) {
     const target = body.mobile_number || body.user_id || '';
     return this.usersService.enrollCourse(target, body.course_id);

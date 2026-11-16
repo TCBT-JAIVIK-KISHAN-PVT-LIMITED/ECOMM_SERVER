@@ -14,41 +14,37 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       this.client = redisUrl
         ? new Redis(redisUrl, {
-          lazyConnect: true,
-          maxRetriesPerRequest: 3,
-          retryStrategy: (times) => {
-            const delay = Math.min(times * 500, 5000);
+            lazyConnect: true,
+            maxRetriesPerRequest: 3,
+            retryStrategy: (times) => {
+              const delay = Math.min(times * 500, 5000);
 
-            if (!this.errorLogged) {
-              console.warn(
-                `⚠️ Redis unavailable, retrying in ${delay}ms...`,
-              );
-              this.errorLogged = true;
-            }
+              if (!this.errorLogged) {
+                console.warn(`⚠️ Redis unavailable, retrying in ${delay}ms...`);
+                this.errorLogged = true;
+              }
 
-            return delay;
-          },
-          enableOfflineQueue: false,
-        })
+              return delay;
+            },
+            enableOfflineQueue: false,
+          })
         : new Redis({
-          host: '127.0.0.1',
-          port: 6379,
-          lazyConnect: true,
-          maxRetriesPerRequest: 3,
-          retryStrategy: (times) => {
-            const delay = Math.min(times * 500, 5000);
+            host: '127.0.0.1',
+            port: 6379,
+            lazyConnect: true,
+            maxRetriesPerRequest: 3,
+            retryStrategy: (times) => {
+              const delay = Math.min(times * 500, 5000);
 
-            if (!this.errorLogged) {
-              console.warn(
-                `⚠️ Redis unavailable, retrying in ${delay}ms...`,
-              );
-              this.errorLogged = true;
-            }
+              if (!this.errorLogged) {
+                console.warn(`⚠️ Redis unavailable, retrying in ${delay}ms...`);
+                this.errorLogged = true;
+              }
 
-            return delay;
-          },
-          enableOfflineQueue: false,
-        });
+              return delay;
+            },
+            enableOfflineQueue: false,
+          });
 
       this.client.on('connect', () => {
         this.isConnected = true;

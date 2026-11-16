@@ -30,7 +30,6 @@ type ProductMongoFilter = {
  */
 @Injectable()
 export class ProductsService {
-
   constructor(
     @InjectModel(Product.name)
     private readonly productModel: Model<Product>,

@@ -76,7 +76,9 @@ export class OrdersService {
       shippingCharge = shipping.shippingCharge;
       console.log('Calculated Shipping Charge:', shippingCharge);
     } else {
-      console.log('Total Weight is 0 — skipping ShipMozo API, shipping charge = 0');
+      console.log(
+        'Total Weight is 0 — skipping ShipMozo API, shipping charge = 0',
+      );
     }
     const finalAmount = discountedAmount + shippingCharge;
 
@@ -333,7 +335,9 @@ export class OrdersService {
     });
 
     if (!order) {
-      console.error(`❌ [verifyAndConfirmOrder] Order "${cleanId}" not found in DB`);
+      console.error(
+        `❌ [verifyAndConfirmOrder] Order "${cleanId}" not found in DB`,
+      );
       throw new NotFoundException('Order not found');
     }
 
@@ -413,7 +417,14 @@ export class OrdersService {
    */
   async retryZohoSync(orderId: string) {
     const order = await this.orderModel.findOne({
-      $or: [{ orderId }, { _id: Types.ObjectId.isValid(orderId) ? new Types.ObjectId(orderId) : undefined }].filter(Boolean),
+      $or: [
+        { orderId },
+        {
+          _id: Types.ObjectId.isValid(orderId)
+            ? new Types.ObjectId(orderId)
+            : undefined,
+        },
+      ].filter(Boolean),
     });
 
     if (!order) {
@@ -465,11 +476,10 @@ export class OrdersService {
     (order as any).customerName = user.name || '';
     (order as any).customerMobile = user.mobile_number || '';
 
-    const result =
-      await this.zohoInventoryService.createSalesOrderWithInvoice(
-        order,
-        zohoContactId,
-      );
+    const result = await this.zohoInventoryService.createSalesOrderWithInvoice(
+      order,
+      zohoContactId,
+    );
 
     order.zohoSalesOrderId = result.salesOrderId;
     order.zohoInvoiceId = result.invoiceId;
