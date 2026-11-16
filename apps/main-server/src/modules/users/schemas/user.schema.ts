@@ -8,11 +8,13 @@ class OTP {
   @Prop()
   code!: string;
 
-  @Prop()
-  expires_at!: Date;
 
   @Prop({ default: 0 })
   attempts!: number;
+
+  @Prop()
+  expires_at!: Date;
+
 }
 
 @Schema({ _id: true })
