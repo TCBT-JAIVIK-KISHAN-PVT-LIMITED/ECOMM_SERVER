@@ -36,8 +36,7 @@ export class PaymentsController {
   @Post('webhook')
   async handleWebhook(@Req() req: RawBodyRequest) {
     // Zoho sends signature as 'x-zoho-webhook-signature: t=<ts>,v=<hex>'
-    const sigHeader =
-      (req.headers['x-zoho-webhook-signature'] as string) || '';
+    const sigHeader = (req.headers['x-zoho-webhook-signature'] as string) || '';
 
     this.logger.log(
       `[Webhook] x-zoho-webhook-signature: ${sigHeader || '❌ MISSING'}`,
@@ -106,9 +105,7 @@ export class PaymentsController {
     secret: string,
   ): boolean {
     if (!receivedV) {
-      this.logger.warn(
-        '[verifySignature] ⚠️ No v= value in signature header',
-      );
+      this.logger.warn('[verifySignature] ⚠️ No v= value in signature header');
       return false;
     }
 
@@ -133,7 +130,9 @@ export class PaymentsController {
       .digest('hex');
 
     if (fallback.toLowerCase() === receivedV.toLowerCase()) {
-      this.logger.log('[verifySignature] ✅ Matched on fallback (rawBody only)');
+      this.logger.log(
+        '[verifySignature] ✅ Matched on fallback (rawBody only)',
+      );
       return true;
     }
 

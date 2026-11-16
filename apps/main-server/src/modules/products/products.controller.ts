@@ -13,9 +13,7 @@ import { FilterProductsDto } from './dto/filter-products.dto';
 
 @Controller('products')
 export class ProductsController {
-  constructor(
-    private readonly productsService: ProductsService,
-  ) {}
+  constructor(private readonly productsService: ProductsService) {}
 
   // ─────────────────────────────────────────
   // Get all active products

@@ -214,7 +214,8 @@ export class ShipwalaProvider implements ShippingProvider {
     this.cachedToken = data.data.access_token;
 
     // Set expiry: token valid for expiryDays, stored with buffer
-    const expiryMs = (data.data.expires_in_days || expiryDays) * 24 * 60 * 60 * 1000;
+    const expiryMs =
+      (data.data.expires_in_days || expiryDays) * 24 * 60 * 60 * 1000;
     this.tokenExpiresAt = new Date(Date.now() + expiryMs);
 
     this.logger.log(
@@ -301,7 +302,9 @@ export class ShipwalaProvider implements ShippingProvider {
         })),
       )}`,
     );
-    this.logger.log(`Shipwale raw response data: ${JSON.stringify(data?.data)}`);
+    this.logger.log(
+      `Shipwale raw response data: ${JSON.stringify(data?.data)}`,
+    );
 
     if (!availableRates.length) {
       this.logger.warn('Shipwale returned empty available_rates');
@@ -405,10 +408,9 @@ export class ShipwalaProvider implements ShippingProvider {
   async getOrderDetails(orderId: string): Promise<any> {
     const token = await this.getToken();
 
-    const response = await this.axiosInstance.get(
-      `/api/v1/orders/${orderId}`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
+    const response = await this.axiosInstance.get(`/api/v1/orders/${orderId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
     return response.data?.data || null;
   }
@@ -438,10 +440,7 @@ export class ShipwalaProvider implements ShippingProvider {
    * @param identifier — Shipwale Order ID (SWXD...), carrier AWB, or store reference number
    * @param comprehensive — If true, returns full scan history; otherwise returns quick status only
    */
-  async getTracking(
-    identifier: string,
-    comprehensive = false,
-  ): Promise<any> {
+  async getTracking(identifier: string, comprehensive = false): Promise<any> {
     const token = await this.getToken();
     const endpoint = comprehensive
       ? `/api/v1/tracking/${identifier}/details`

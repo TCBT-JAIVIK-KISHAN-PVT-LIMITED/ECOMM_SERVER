@@ -78,9 +78,7 @@ export class OrdersController {
 
   // ── Admin: Retry Zoho sync for ALL failed orders ───────────────────
   @Post('admin/retry-zoho-sync-all')
-  async retryAllFailedZohoSync(
-    @Headers('x-admin-key') adminKey: string,
-  ) {
+  async retryAllFailedZohoSync(@Headers('x-admin-key') adminKey: string) {
     if (adminKey !== process.env.ADMIN_API_KEY) {
       throw new UnauthorizedException('Invalid admin key');
     }
@@ -88,4 +86,3 @@ export class OrdersController {
     return this.ordersService.retryAllFailedZohoSync();
   }
 }
-

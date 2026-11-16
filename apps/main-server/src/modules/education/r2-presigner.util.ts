@@ -42,10 +42,7 @@ export function generateR2PresignedUrl(options: PresignR2Options): string {
 
   // Encode URI path (each path segment encoded, preserving slashes)
   const cleanKey = key.replace(/^\/+/, '');
-  const encodedKey = cleanKey
-    .split('/')
-    .map(encodeURIComponent)
-    .join('/');
+  const encodedKey = cleanKey.split('/').map(encodeURIComponent).join('/');
   const canonicalUri = `/${bucketName}/${encodedKey}`;
 
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
@@ -62,8 +59,7 @@ export function generateR2PresignedUrl(options: PresignR2Options): string {
   const canonicalQueryString = Object.keys(queryParams)
     .sort()
     .map(
-      (k) =>
-        `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`,
+      (k) => `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`,
     )
     .join('&');
 

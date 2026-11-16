@@ -76,9 +76,7 @@ export class ShippingAggregatorService {
     );
 
     if (!this.shipwalaProvider.isAvailable()) {
-      this.logger.warn(
-        'Shipwala not configured — falling back to ShipMozo',
-      );
+      this.logger.warn('Shipwala not configured — falling back to ShipMozo');
       return this.routeViaShipMozo(request);
     }
 
@@ -139,7 +137,9 @@ export class ShippingAggregatorService {
     try {
       rates = await this.bigShipProvider.calculateRate(request);
     } catch (err: any) {
-      this.logger.warn(`BigShip error (${err.message}) — falling back to Shipwala`);
+      this.logger.warn(
+        `BigShip error (${err.message}) — falling back to Shipwala`,
+      );
       if (this.shipwalaProvider.isAvailable()) {
         return this.routeViaShipwale(request);
       }

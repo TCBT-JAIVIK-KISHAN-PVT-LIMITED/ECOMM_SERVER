@@ -28,11 +28,39 @@ export class EducationController {
 
   /**
    * GET /education/courses/:courseId/lectures
-   * Public list of lectures in the course
+   * Public list of lectures in the course (dynamically synced from R2)
    */
   @Get('courses/:courseId/lectures')
   getCourseLectures(@Param('courseId') courseId: string) {
     return this.educationService.getCourseLectures(courseId);
+  }
+
+  /**
+   * POST /education/courses/:courseId/sync
+   * Force trigger dynamic synchronization from Cloudflare R2
+   */
+  @Post('courses/:courseId/sync')
+  async syncCourseLectures(@Param('courseId') courseId: string) {
+    const course = await this.educationService.syncLectures(courseId);
+    return {
+      success: true,
+      courseId: course.id,
+      totalLectures: course.lectures.length,
+      totalDuration: course.lectures.reduce((s, l) => s + (l.duration || 0), 0),
+      message: `Successfully synchronized ${course.lectures.length} lectures from Cloudflare R2`,
+    };
+  }
+
+  @Get('courses/:courseId/sync')
+  async getSyncCourseLectures(@Param('courseId') courseId: string) {
+    const course = await this.educationService.syncLectures(courseId);
+    return {
+      success: true,
+      courseId: course.id,
+      totalLectures: course.lectures.length,
+      totalDuration: course.lectures.reduce((s, l) => s + (l.duration || 0), 0),
+      message: `Successfully synchronized ${course.lectures.length} lectures from Cloudflare R2`,
+    };
   }
 
   /**
@@ -56,7 +84,11 @@ export class EducationController {
       userId = payload?.sub || payload?.userId || null;
     }
 
-    return this.educationService.getLectureWatchUrl(userId, lectureId, courseId);
+    return this.educationService.getLectureWatchUrl(
+      userId,
+      lectureId,
+      courseId,
+    );
   }
 
   /**
