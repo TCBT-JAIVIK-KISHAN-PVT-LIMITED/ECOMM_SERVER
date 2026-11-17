@@ -6,7 +6,7 @@
   "compilerOptions": {
     "webpack": false,
     "tsConfigPath": "apps/main-server/tsconfig.app.json",
-    "deleteOutDir": true
+    "deleteOutDir": false
   },
   "projects": {
     "main-server": {

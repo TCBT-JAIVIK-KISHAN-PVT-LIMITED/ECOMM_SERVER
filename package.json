@@ -6,7 +6,8 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build main-server",
+    "build": "nest build main-server && nest build shipping-service",
+    "build:main": "nest build main-server",
     "build:shipping": "nest build shipping-service",
     "format": "prettier --write \"apps/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start main-server",
@@ -20,7 +21,7 @@
     "pm2:restart": "npx pm2 restart ecosystem.config.js",
     "pm2:delete": "npx pm2 delete ecosystem.config.js",
     "pm2:ls": "npx pm2 ls",
-    "pm2:logs": "npx pm2 logs tcbt-app-server",
+    "pm2:logs": "npx pm2 logs",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
